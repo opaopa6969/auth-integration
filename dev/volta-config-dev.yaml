@@ -1,0 +1,10 @@
+version: 1
+
+# Part 2 (独自DB) では IdP は使わない
+# Magic Link / Passkey / Invite だけで認証する
+idp: []
+
+apps:
+  - id: app-todo
+    url: http://localhost:8888
+    allowed_roles: [MEMBER, ADMIN, OWNER]

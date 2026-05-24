@@ -1,0 +1,12 @@
+# 秘密が入る dev フォルダは除外
+dev/jwt-private.pem
+dev/jwt-public.pem
+dev/jwt-key-encryption-secret.txt
+dev/volta-service-token.txt
+dev/auth-proxy-dev.env
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
