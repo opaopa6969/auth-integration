@@ -1,0 +1,56 @@
+# volta-gateway 設定 (docker-compose 版)
+# Part 2 のローカル構成を docker network 上に移植したもの。
+#
+# host 名解決は docker network の service 名を使う:
+#   auth-proxy  / todo-sample / console
+#
+# 制約: volta-gateway は「同一 host での path_prefix ルーティング」非対応
+#       (gateway/src/config.rs:403)。なので 1 host = 1 route とし、
+#       auth-proxy 自身が出すページ/API は auth_bypass_paths の
+#       backend 上書き (proxy.rs:624) で auth-proxy へ流す。
+
+server:
+  port: 8888
+  read_timeout_secs: 10
+  request_timeout_secs: 30
+
+auth:
+  volta_url: http://auth-proxy:7070      # docker service 名。ローカルの :7077 相当
+  verify_path: /auth/verify
+  timeout_ms: 2000                       # 初回 JWT 署名 + DB は遅いので余裕を持たせる
+  pool_max_idle: 32
+
+routing:
+  # ── アプリ本体 (localhost) ───────────────────────────────
+  - host: localhost
+    backend: http://todo-sample:7743     # 認証が要る既定 backend
+    app_id: app-todo
+    auth_bypass_paths:
+      # auth-proxy が自分で描画/処理するパスは「認証スキップ + auth-proxy へ」
+      - { prefix: /login,         backend: http://auth-proxy:7070 }
+      - { prefix: /logout,        backend: http://auth-proxy:7070 }
+      - { prefix: /auth,          backend: http://auth-proxy:7070 }
+      - { prefix: /callback,      backend: http://auth-proxy:7070 }
+      - { prefix: /select-tenant, backend: http://auth-proxy:7070 }
+      - { prefix: /mfa,           backend: http://auth-proxy:7070 }
+      - { prefix: /oauth,         backend: http://auth-proxy:7070 }
+      - { prefix: /api,           backend: http://auth-proxy:7070 }
+      - { prefix: /.well-known,   backend: http://auth-proxy:7070 }
+      - { prefix: /css,           backend: http://auth-proxy:7070 }
+      - { prefix: /js,            backend: http://auth-proxy:7070 }
+
+  # ── admin console (別 host) ──────────────────────────────
+  # console.localhost で静的 SPA を配信。SPA からの /api /auth は
+  # console コンテナ内 nginx が auth-proxy へ proxy する。
+  - host: console.localhost
+    backend: http://console:80
+    app_id: app-console
+    public: true                         # SPA 自体は静的。認証は API 呼び出し時に効く
+
+healthcheck:
+  interval_secs: 30
+  path: /healthz
+
+logging:
+  level: info
+  format: pretty

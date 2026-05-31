@@ -67,6 +67,7 @@ flowchart LR
 | 14 | [14-Passkey認証.md](14-Passkey認証.md) | `/login` ページから WebAuthn 登録 → ログイン |
 | 15 | [15-Invite認証.md](15-Invite認証.md) | admin が invitation 作成 → 招待リンク踏む |
 | 16 | [16-Part2振り返り.md](16-Part2振り返り.md) | 3 方式比較表 / Part 3 への橋渡し |
+| 17 | [17-docker-compose化.md](17-docker-compose化.md) | 手起動の 4 プロセスを `docker compose up` 一発に。console / mailpit も追加 |
 
 ---
 

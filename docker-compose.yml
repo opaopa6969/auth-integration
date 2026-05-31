@@ -1,0 +1,166 @@
+# =============================================================================
+# auth-integration Part 2 — docker-compose 一式
+#
+#   volta-gateway (:8888 唯一の入口)
+#     ├─ /todos など       → todo-sample (要認証)
+#     ├─ /login /auth ...   → volta-auth-proxy (認証ページ/API, 認証スキップ)
+#     └─ console.localhost  → volta-auth-console (admin SPA)
+#   volta-auth-proxy → postgres / mailpit
+#
+# 使い方:
+#   1. dev/auth-proxy-dev.env を用意 (11-本物auth-proxy起動.md の手順)
+#   2. docker compose up --build
+#   3. ブラウザ  http://localhost:8888/        (todo)
+#                http://console.localhost:8888/ (admin console)
+#      mailpit   http://localhost:8025/         (届いたメール)
+#
+# 詳細は 30-docker-compose化.md 参照。
+# =============================================================================
+
+services:
+
+  # ── PostgreSQL (dev 独立) ─────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB:       volta_auth
+      POSTGRES_USER:     volta
+      POSTGRES_PASSWORD: volta
+    ports:
+      - "54330:5432"           # ホストからも覗けるように (ローカルの dev port に合わせる)
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U volta -d volta_auth"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+    restart: unless-stopped
+
+  # ── Redis (auth イベント / tramli-viz telemetry の publish 先) ──
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  # ── Mailpit (SMTP catcher) ────────────────────────────────
+  mailpit:
+    image: axllent/mailpit:v1.22
+    ports:
+      - "8025:8025"            # Web UI
+    restart: unless-stopped
+
+  # ── volta-auth-proxy (本物の認証 backend / Java) ──────────
+  # 注意: auth-proxy は org.unlaxer:tramli (maven central に無いローカル成果物) に
+  #       依存するため、クリーンなコンテナでの「自己完結ビルド」は不可能。
+  #       → ch11 と同じく、ホストでビルド済みの fat jar を JRE で動かす。
+  #       jar が無ければ: cd <auth-proxy> && mvn -DskipTests package
+  auth-proxy:
+    # JDK 必須: JTE テンプレートを実行時コンパイルする (Main.java:72 DirectoryCodeResolver)。
+    image: eclipse-temurin:21-jdk
+    working_dir: /app
+    command: ["java", "-jar", "/app/app.jar"]
+    env_file:
+      - ./dev/auth-proxy-dev.env      # 秘密 (JWT 鍵 / secret) を流用
+      - ./docker/auth-proxy.docker.env # docker 向けの上書き (非秘密)
+    volumes:
+      - ${AUTH_PROXY_SRC:-../../AskOS-workspace/volta-auth-proxy}/target/volta-auth-proxy-0.3.0-SNAPSHOT.jar:/app/app.jar:ro
+      # JTE テンプレートはファイルシステムから読む (jar には含まれない)。
+      - ${AUTH_PROXY_SRC:-../../AskOS-workspace/volta-auth-proxy}/src/main/jte:/app/src/main/jte:ro
+      - ./docker/volta-config-docker.yaml:/app/volta-config.yaml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      mailpit:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/7070' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30           # 初回はマイグレーション + 起動で数十秒かかる
+      start_period: 90s
+    restart: unless-stopped
+
+  # ── todo-sample (対象アプリ / Java + Jetty) ───────────────
+  todo-sample:
+    build:
+      context: ../todo-sample
+      dockerfile_inline: |
+        FROM maven:3.9-eclipse-temurin-17
+        WORKDIR /app
+        COPY pom.xml .
+        # この todo-sample copy は pom の httpConnector port が 3001。
+        # ハンズオン文書 / gateway 設定はすべて 7743 なので 7743 に正規化する。
+        # (pom の <httpConnector><port> は -Djetty.http.port より優先されるため pom 側で直す)
+        RUN sed -i 's#<port>3001</port>#<port>7743</port>#' pom.xml
+        # jetty プラグイン本体も含め依存をビルド時に取得 (実行時のDLを無くす)
+        RUN mvn -B dependency:resolve dependency:resolve-plugins \
+                org.eclipse.jetty:jetty-maven-plugin:11.0.20:help || true
+        COPY src ./src
+        EXPOSE 7743
+        # -q を付けない: 付けると Jetty 起動ログもエラーも消えてデバッグ不能になる
+        CMD ["mvn", "-B", "jetty:run"]
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/7743' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    restart: unless-stopped
+
+  # ── volta-auth-console (admin SPA / 静的配信) ─────────────
+  # file:../DxE-suite 依存のため in-docker で npm build できない。
+  # ホストでビルド済みの dist/ を nginx で配る。
+  #   再ビルド: cd ../volta-auth-console && npm run build
+  console:
+    build:
+      context: ../volta-auth-console
+      dockerfile_inline: |
+        FROM nginx:1.27-alpine
+        COPY dist /usr/share/nginx/html
+    volumes:
+      - ./docker/console.nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      auth-proxy:
+        condition: service_started
+    restart: unless-stopped
+
+  # ── volta-gateway (唯一の入口 / Rust) ─────────────────────
+  gateway:
+    build:
+      context: ../volta-gateway
+      dockerfile_inline: |
+        FROM rust:1-bookworm AS build
+        WORKDIR /src
+        COPY . .
+        RUN cargo build --release -p volta-gateway
+        FROM debian:bookworm-slim
+        RUN apt-get update \
+         && apt-get install -y --no-install-recommends ca-certificates curl libssl3 \
+         && rm -rf /var/lib/apt/lists/*
+        COPY --from=build /src/target/release/volta-gateway /usr/local/bin/volta-gateway
+        EXPOSE 8888
+        ENTRYPOINT ["volta-gateway"]
+        CMD ["/etc/volta/todo-gateway.yaml"]
+    ports:
+      - "8888:8888"            # 唯一外に開けるポート
+    volumes:
+      - ./docker/todo-gateway-docker.yaml:/etc/volta/todo-gateway.yaml:ro
+    depends_on:
+      auth-proxy:
+        condition: service_healthy
+      todo-sample:
+        condition: service_started
+      console:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8888/login -o /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  pgdata:
