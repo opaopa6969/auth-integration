@@ -40,7 +40,7 @@ flowchart LR
 | `postgres` | dev DB | 54330→5432 | image |
 | `redis` | auth イベント / telemetry の publish 先 | (内部 6379) | image |
 | `mailpit` | SMTP catcher + メール閲覧 UI | 8025 | image |
-| `auth-proxy` | 本物の認証 backend (Java) | (内部 7070) | ビルド済み jar を **JDK** で実行 |
+| `auth-proxy` | 本物の認証 backend (Java) | (内部 7070) | ソースから**完全自己完結ビルド** (多段) |
 | `todo-sample` | 対象アプリ (Java/Jetty) | (内部 7743) | maven jetty:run |
 | `console` | admin SPA (静的) | (内部 80) | nginx + dist |
 | `gateway` | **唯一の入口** (Rust) | 8888 | cargo build (完全自己完結) |
@@ -152,37 +152,47 @@ sequenceDiagram
 > 秘密 (鍵) は dev のまま、ネットワーク依存の値だけ docker 用で塗り替える。
 > 秘密ファイルは相変わらず gitignore、docker 用ファイルは commit していい。」
 
-> **後輩**「auth-proxy は `mvn package` をコンテナの中でやらないんですか? 自己完結っぽくないです。」
+> **後輩**「auth-proxy はソースからビルドするんですね。前は『tramli が Central に無いから無理』
+> って言ってませんでした?」
 
-> **先輩**「**できない**。auth-proxy は `org.unlaxer:tramli` っていう **maven central に
-> publish されてないローカル成果物**に依存してる。クリーンなコンテナからは引けない。
-> だから ch11 と同じで、**ホストでビルドした fat jar を JRE イメージで動かす**:」
+> **先輩**「**言った。で、出した**。`org.unlaxer:tramli:3.7.1` を Maven Central に deploy したから、
+> もうクリーンなコンテナから普通に引ける。なので auth-proxy は**多段ビルドで完全自己完結**:」
 
 ```yaml
   auth-proxy:
-    image: eclipse-temurin:21-jdk        # JRE では足りない (後述)
-    command: ["java", "-jar", "/app/app.jar"]
-    volumes:
-      - .../target/volta-auth-proxy-0.3.0-SNAPSHOT.jar:/app/app.jar:ro
-      - .../src/main/jte:/app/src/main/jte:ro   # JTE テンプレートは FS から読む
+    build:
+      context: <auth-proxy>
+      dockerfile_inline: |
+        FROM maven:3.9-eclipse-temurin-21 AS build
+        WORKDIR /src
+        COPY pom.xml .
+        RUN mvn -B -DskipTests dependency:go-offline || true   # tramli は Central から
+        COPY src ./src
+        RUN mvn -B -DskipTests clean package                   # fat jar を焼く
+        FROM eclipse-temurin:21-jdk          # ← JRE ではダメ (後述)
+        WORKDIR /app
+        COPY --from=build /src/target/volta-auth-proxy-0.3.0-SNAPSHOT.jar /app/app.jar
+        COPY --from=build /src/src/main/jte /app/src/main/jte   # JTE を同梱
+        CMD ["java", "-jar", "/app/app.jar"]
 ```
 
-> **後輩**「`jre` じゃなくて `jdk` なんですね。あと `src/main/jte` を mount してる…」
+> **後輩**「runtime が `jre` じゃなくて `jdk`、しかも `src/main/jte` を**コピーで同梱**してますね。」
 
 > **先輩**「auth-proxy の `Main.java` が JTE を `DirectoryCodeResolver("src/main/jte")` で
 > **実行時にファイルから読んでコンパイル**する作りなんだ (precompiled じゃない)。だから:
-> ① テンプレート `.jte` を mount する ② コンパイルに `javac` が要るから **JDK** イメージ。
-> JRE で動かすと `/login` 開いた瞬間 `TemplateNotFoundException` で 504 になる。実際なった。」
+> ① テンプレート `.jte` を runtime に置く ② コンパイルに `javac` が要るから **JDK** イメージ。
+> JRE で動かすと `/login` 開いた瞬間 `TemplateNotFoundException` で 504 になる。実際なった。
+> (前は jar も jte もホストから mount してたが、ビルド成果物を image に焼けば mount 不要)」
 
 > **後輩**「redis も足したんですね。」
 
 > **先輩**「auth-proxy はログイン成功イベントを redis に publish する (`JedisPooled`)。
 > 無いとログイン経路で詰むから、`redis:7-alpine` を 1 個足して `REDIS_URL=redis://redis:6379`。」
 
-> **先輩**「jar が無ければ `mvn -DskipTests package` で焼く (ch11 の手順)。
-> gateway は Rust で全 crate がワークスペースに揃ってるから**そっちは完全自己完結**でビルドできる。
-> 公開リポジトリに無い依存を持つ Java 2 つ (auth-proxy=tramli / console=dxe-suite) だけ、
-> ホスト成果物を持ち込む、と覚えとけ。」
+> **先輩**「これで gateway (Rust) も auth-proxy (Java) も todo (Java) も**全部ソースから
+> `docker compose up --build` で立つ**。唯一 console だけ `@unlaxer/dxe-suite` が
+> npm のローカル `file:` 依存で残ってるんで、そっちはビルド済み `dist/` を配ってる。
+> (dxe-suite も npm publish すれば console も自己完結になる)」
 
 ---
 
@@ -212,8 +222,8 @@ sequenceDiagram
 cd auth-integration
 
 # 0a. 秘密 env が無ければ 11 章の手順で dev/auth-proxy-dev.env を作る
-# 0b. auth-proxy の fat jar を焼く: (cd <auth-proxy> && mvn -DskipTests package)
-# 0c. console を直したなら dist を焼く: (cd ../volta-auth-console && npm run build)
+# 0b. console を直したなら dist を焼く: (cd ../volta-auth-console && npm run build)
+#     (auth-proxy / gateway / todo はソースから自動ビルドされる。事前準備不要)
 
 # 1. ビルド + 起動
 docker compose up --build -d
@@ -310,11 +320,13 @@ bypass の prefix に backend 上書きが付いているか。
 → `dist/` が古い or 未ビルド。`cd ../volta-auth-console && npm run build` で焼き直して
 `docker compose up --build console`。
 
-### F. auth-proxy が `Error: Unable to access jarfile /app/app.jar`
+### F. auth-proxy のビルドで `Could not find artifact org.unlaxer:tramli:jar:3.7.1`
 
-→ ホストに fat jar が無い。`cd <auth-proxy> && mvn -DskipTests package` で焼く。
-別の場所に置いてるなら `AUTH_PROXY_SRC=/path/to/volta-auth-proxy docker compose up` で指定。
-バージョンが上がって jar 名が変わったら compose の mount パスも合わせる。
+→ Central へ deploy 直後はまだ `repo1.maven.org` に同期されてない (公開から数分〜数十分)。
+`curl -sI https://repo1.maven.org/maven2/org/unlaxer/tramli/3.7.1/tramli-3.7.1.pom`
+が 200 になってから `docker compose build auth-proxy`。
+別バージョンを使うなら pom の version と Dockerfile の jar 名を合わせる。
+auth-proxy のソースが別の場所なら `AUTH_PROXY_SRC=/path docker compose build`。
 
 ### G. `/login` が 504 / `TemplateNotFoundException: .../src/main/jte/...`
 

@@ -50,22 +50,33 @@ services:
     restart: unless-stopped
 
   # ── volta-auth-proxy (本物の認証 backend / Java) ──────────
-  # 注意: auth-proxy は org.unlaxer:tramli (maven central に無いローカル成果物) に
-  #       依存するため、クリーンなコンテナでの「自己完結ビルド」は不可能。
-  #       → ch11 と同じく、ホストでビルド済みの fat jar を JRE で動かす。
-  #       jar が無ければ: cd <auth-proxy> && mvn -DskipTests package
+  # org.unlaxer:tramli を Maven Central に公開済みなので、ソースから
+  # 完全自己完結ビルドできる (2025-06 に 3.7.1 を deploy)。
+  #   build stage : maven で fat jar を package (tramli は Central から解決)
+  #   runtime     : JDK ランタイム。JTE は実行時コンパイルなので
+  #                 javac (JDK) + src/main/jte の同梱が要る (Main.java:72)
   auth-proxy:
-    # JDK 必須: JTE テンプレートを実行時コンパイルする (Main.java:72 DirectoryCodeResolver)。
-    image: eclipse-temurin:21-jdk
+    build:
+      context: ${AUTH_PROXY_SRC:-../../AskOS-workspace/volta-auth-proxy}
+      dockerfile_inline: |
+        FROM maven:3.9-eclipse-temurin-21 AS build
+        WORKDIR /src
+        COPY pom.xml .
+        RUN mvn -B -DskipTests dependency:go-offline || true
+        COPY src ./src
+        RUN mvn -B -DskipTests clean package
+        FROM eclipse-temurin:21-jdk
+        WORKDIR /app
+        COPY --from=build /src/target/volta-auth-proxy-0.3.0-SNAPSHOT.jar /app/app.jar
+        # JTE テンプレートは jar に含まれず FS から読むので runtime に同梱
+        COPY --from=build /src/src/main/jte /app/src/main/jte
+        EXPOSE 7070
+        CMD ["java", "-jar", "/app/app.jar"]
     working_dir: /app
-    command: ["java", "-jar", "/app/app.jar"]
     env_file:
       - ./dev/auth-proxy-dev.env      # 秘密 (JWT 鍵 / secret) を流用
       - ./docker/auth-proxy.docker.env # docker 向けの上書き (非秘密)
     volumes:
-      - ${AUTH_PROXY_SRC:-../../AskOS-workspace/volta-auth-proxy}/target/volta-auth-proxy-0.3.0-SNAPSHOT.jar:/app/app.jar:ro
-      # JTE テンプレートはファイルシステムから読む (jar には含まれない)。
-      - ${AUTH_PROXY_SRC:-../../AskOS-workspace/volta-auth-proxy}/src/main/jte:/app/src/main/jte:ro
       - ./docker/volta-config-docker.yaml:/app/volta-config.yaml:ro
     depends_on:
       postgres:
