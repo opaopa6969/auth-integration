@@ -1,18 +1,18 @@
 # Part 2 用 volta-gateway 設定
-# auth backend は dev auth-proxy (:7077)、backend は todo-sample (:7743)
+# auth backend は dev auth-proxy (:27070)、backend は todo-sample (:27743)
 
 server:
-  port: 8888
+  port: 28888
 
 auth:
-  volta_url: http://localhost:7077       # dev auth-proxy
+  volta_url: http://localhost:27070       # dev auth-proxy
   verify_path: /auth/verify
   timeout_ms: 1000                       # auth-proxy が JWT 生成するので少し長め
   pool_max_idle: 32
 
 routing:
   - host: localhost
-    backend: http://localhost:7743       # todo-sample
+    backend: http://localhost:27743       # todo-sample
     app_id: app-todo
 
 healthcheck:

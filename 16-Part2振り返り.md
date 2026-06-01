@@ -101,7 +101,7 @@ flowchart TB
 
 2. **CSRF\_INVALID at /auth/magic-link/send** — Origin ヘッダ無いと拒否される
    - ドキュメントには明記されていない
-   - curl で叩くとき `-H 'Origin: http://localhost:7077'` 必須
+   - curl で叩くとき `-H 'Origin: http://localhost:27070'` 必須
 
 3. **local-bypass がデフォで有効** — `127.0.0.1` を含む CIDR が
    全部通る設計なので、認証フローの検証時はオフにする

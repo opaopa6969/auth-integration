@@ -21,12 +21,12 @@ mvn -DskipTests package
 
 > **後輩**「本番 DB に dev のユーザが混ざるの嫌ですよね。」
 
-> **先輩**「**完全に別コンテナ**で立てる。本番が 54329 なら dev は 54330、みたいに port をずらす。」
+> **先輩**「**完全に別コンテナ**で立てる。本番が 25429 なら dev は 25432、みたいに port をずらす。」
 
 ```bash
 docker run -d --name volta-auth-postgres-dev \
   -e POSTGRES_USER=volta -e POSTGRES_PASSWORD=volta -e POSTGRES_DB=volta_auth \
-  -p 54330:5432 postgres:16-alpine
+  -p 25432:25432 postgres:16-alpine
 ```
 
 確認:
@@ -34,7 +34,7 @@ docker run -d --name volta-auth-postgres-dev \
 ```bash
 $ docker ps --format 'table {{.Names}}\t{{.Ports}}'
 NAMES                       PORTS
-volta-auth-postgres-dev     0.0.0.0:54330->5432/tcp
+volta-auth-postgres-dev     0.0.0.0:25432->25432/tcp
 ```
 
 ## 2. JWT 鍵ペアを生成
@@ -64,13 +64,13 @@ openssl rand -hex 16 > volta-service-token.txt
 最小限の `auth-proxy-dev.env`:
 
 ```bash
-PORT=7077                            # 本番 :7070 と衝突回避
+PORT=27070                            # 本番 :27070 と衝突回避
 DB_HOST=localhost
-DB_PORT=54330                        # dev Postgres
+DB_PORT=25432                        # dev Postgres
 DB_NAME=volta_auth
 DB_USER=volta
 DB_PASSWORD=volta
-BASE_URL=http://localhost:7077
+BASE_URL=http://localhost:27070
 JWT_ISSUER=volta-auth-dev
 JWT_AUDIENCE=volta-apps-dev
 JWT_PRIVATE_KEY_PEM="$(awk '{printf "%s\\n", $0}' dev/jwt-private.pem)"
@@ -103,7 +103,7 @@ idp: []
 
 apps:
   - id: app-todo
-    url: http://localhost:8888
+    url: http://localhost:28888
     allowed_roles: [MEMBER, ADMIN, OWNER]
 ```
 
@@ -123,14 +123,14 @@ nohup java -jar target/volta-auth-proxy-0.3.0-SNAPSHOT.jar > /tmp/auth-proxy-dev
 ## 5. healthz で起動確認
 
 ```bash
-$ curl -s http://localhost:7077/healthz
+$ curl -s http://localhost:27070/healthz
 {"status":"ok"}
 ```
 
 ## 6. 401 が返ることを確認 (バイパス無効化の検証)
 
 ```bash
-$ curl -s -D - http://localhost:7077/auth/verify | head -8
+$ curl -s -D - http://localhost:27070/auth/verify | head -8
 HTTP/1.1 401 Unauthorized
 Date: Sun, 24 May 2026 23:40:52 GMT
 Content-Type: text/plain
@@ -172,8 +172,8 @@ ERROR: relation "users" does not exist
 java.net.BindException: Address already in use
 ```
 
-→ 同じポートで他プロセスが listen してる。`ss -tlnp | grep 7077` で確認。
-本記録では `:7071` を `building-hierarchy` が使ってたので `:7077` にずらした。
+→ 同じポートで他プロセスが listen してる。`ss -tlnp | grep 27070` で確認。
+本記録では `:7071` を `building-hierarchy` が使ってたので `:27070` にずらした。
 
 ## 次
 

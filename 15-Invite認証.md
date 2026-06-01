@@ -64,15 +64,15 @@ sequenceDiagram
 
 ```bash
 EMAIL="admin-$(date +%s)@example.com"   # ユニークな email を毎回生成
-TOK=$(curl -s -X POST -H 'Content-Type: application/json' -H 'Origin: http://localhost:7077' \
+TOK=$(curl -s -X POST -H 'Content-Type: application/json' -H 'Origin: http://localhost:27070' \
       -d "{\"email\":\"$EMAIL\"}" \
-      http://localhost:7077/auth/magic-link/send | jq -r .token)
+      http://localhost:27070/auth/magic-link/send | jq -r .token)
 
-H=$(curl -s -D - -o /dev/null "http://localhost:7077/auth/magic-link/verify?token=$TOK")
+H=$(curl -s -D - -o /dev/null "http://localhost:27070/auth/magic-link/verify?token=$TOK")
 COOKIE=$(echo "$H" | awk -F': ' 'BEGIN{IGNORECASE=1} /^set-cookie:/ {print $2}' | head -1 | cut -d';' -f1 | tr -d '\r')
 
 # admin の tenant_id を auth/verify ヘッダから取得
-TENANT=$(curl -s -D - -H "Cookie: $COOKIE" -o /dev/null http://localhost:7077/auth/verify | \
+TENANT=$(curl -s -D - -H "Cookie: $COOKIE" -o /dev/null http://localhost:27070/auth/verify | \
          awk -F': ' 'BEGIN{IGNORECASE=1} /^x-volta-tenant-id:/ {print $2}' | tr -d '\r')
 echo "admin: $EMAIL"
 echo "tenant: $TENANT"
@@ -89,13 +89,13 @@ echo "tenant: $TENANT"
 
 ```bash
 $ curl -s -H "Cookie: $COOKIE" -X POST \
-       -H 'Content-Type: application/json' -H "Origin: http://localhost:7077" \
+       -H 'Content-Type: application/json' -H "Origin: http://localhost:27070" \
        -d '{"email":"invitee-1779666748@example.com","role":"MEMBER","max_uses":1,"expires_in_hours":24}' \
-       "http://localhost:7077/api/v1/tenants/$TENANT/invitations"
+       "http://localhost:27070/api/v1/tenants/$TENANT/invitations"
 {
   "code": "EXX09dhOfCY843nxnSC41YCLNqwrPsGn",
-  "id": "073a465d-7070-4932-a086-3f813d995b7d",
-  "link": "http://localhost:7077/invite/EXX09dhOfCY843nxnSC41YCLNqwrPsGn",
+  "id": "073a465d-27070-4932-a086-3f813d995b7d",
+  "link": "http://localhost:27070/invite/EXX09dhOfCY843nxnSC41YCLNqwrPsGn",
   "expiresAt": "2026-05-25T23:52:29.031094212Z"
 }
 ```
@@ -109,7 +109,7 @@ $ curl -s -H "Cookie: $COOKIE" -X POST \
 ### Step 3: invitee がリンクを開く (未ログイン)
 
 ```bash
-$ curl -s "http://localhost:7077/invite/$CODE" | head -20
+$ curl -s "http://localhost:27070/invite/$CODE" | head -20
 <!doctype html>
 ...
 <h1>ワークスペース招待</h1>
@@ -123,13 +123,13 @@ $ curl -s "http://localhost:7077/invite/$CODE" | head -20
 ### Step 4: invitee が Magic Link でログイン → invite ページに戻る
 
 ```bash
-INV_TOK=$(curl -s -X POST -H 'Content-Type: application/json' -H 'Origin: http://localhost:7077' \
+INV_TOK=$(curl -s -X POST -H 'Content-Type: application/json' -H 'Origin: http://localhost:27070' \
           -d '{"email":"invitee-1779666748@example.com"}' \
-          http://localhost:7077/auth/magic-link/send | jq -r .token)
-INV_COOKIE=$(curl -s -D - -o /dev/null "http://localhost:7077/auth/magic-link/verify?token=$INV_TOK" | \
+          http://localhost:27070/auth/magic-link/send | jq -r .token)
+INV_COOKIE=$(curl -s -D - -o /dev/null "http://localhost:27070/auth/magic-link/verify?token=$INV_TOK" | \
              awk -F': ' 'BEGIN{IGNORECASE=1} /^set-cookie:/ {print $2}' | head -1 | cut -d';' -f1 | tr -d '\r')
 
-$ curl -s -H "Cookie: $INV_COOKIE" "http://localhost:7077/invite/$CODE" | head -30
+$ curl -s -H "Cookie: $INV_COOKIE" "http://localhost:27070/invite/$CODE" | head -30
 <!doctype html>
 ...
 <h1>ワークスペース招待</h1>
@@ -152,9 +152,9 @@ $ curl -s -H "Cookie: $INV_COOKIE" "http://localhost:7077/invite/$CODE" | head -
 ```bash
 # form の hidden 値を抽出 (実際は jsoup や grep で)
 $ curl -s -H "Cookie: $INV_COOKIE" -X POST \
-       -H 'Content-Type: application/json' -H 'Origin: http://localhost:7077' \
+       -H 'Content-Type: application/json' -H 'Origin: http://localhost:27070' \
        -d "{\"flow_id\":\"<上で取った flow_id>\"}" \
-       "http://localhost:7077/invite/$CODE/accept"
+       "http://localhost:27070/invite/$CODE/accept"
 {
   "ok": true,
   "redirect_to": "/console/"
@@ -167,7 +167,7 @@ $ curl -s -H "Cookie: $INV_COOKIE" -X POST \
 
 ```bash
 $ curl -s -D - -H "Cookie: $INV_COOKIE" -o /dev/null \
-       http://localhost:7077/auth/verify | grep -i 'x-volta-tenant'
+       http://localhost:27070/auth/verify | grep -i 'x-volta-tenant'
 X-Volta-Tenant-Id: e90472f0-b917-4bf9-aa7e-6af45dee2b8a   # admin と同じ tenant!
 X-Volta-Tenant-Slug: admin-1779666748-...
 ```
@@ -185,7 +185,7 @@ invitee の current tenant が **personal tenant から admin の tenant に切�
 
 ```bash
 $ curl -s -H "Cookie: $INV_COOKIE" -H 'Accept: application/json' \
-       "http://localhost:7077/invite/$CODE"
+       "http://localhost:27070/invite/$CODE"
 {
   "tenantName": "admin-1779666748 workspace",
   "tenantId": "e90472f0-b917-...",
@@ -206,7 +206,7 @@ admin は自分の招待を一覧 / 取消できる:
 ```bash
 # 一覧
 $ curl -s -H "Cookie: $COOKIE" \
-       "http://localhost:7077/api/v1/tenants/$TENANT/invitations" | jq
+       "http://localhost:27070/api/v1/tenants/$TENANT/invitations" | jq
 [
   {
     "id": "073a465d-...",
@@ -222,7 +222,7 @@ $ curl -s -H "Cookie: $COOKIE" \
 
 # 取消 (まだ未使用なら無効化)
 $ curl -X DELETE -H "Cookie: $COOKIE" \
-       "http://localhost:7077/api/v1/tenants/$TENANT/invitations/$INVID"
+       "http://localhost:27070/api/v1/tenants/$TENANT/invitations/$INVID"
 ```
 
 ---

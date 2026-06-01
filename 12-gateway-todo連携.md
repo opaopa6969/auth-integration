@@ -4,23 +4,23 @@
 
 > **後輩**「auth-proxy 立ったので、Part 1 の gateway を **mock じゃなくて本物**に向けます。」
 
-> **先輩**「設定変えるのは **1 行** だ。`volta_url` を `:7077` に向ける。」
+> **先輩**「設定変えるのは **1 行** だ。`volta_url` を `:27070` に向ける。」
 
 ## gateway 設定 (`dev/todo-gateway-dev.yaml`)
 
 ```yaml
 server:
-  port: 8888
+  port: 28888
 
 auth:
-  volta_url: http://localhost:7077       # ← Part 1 の :7072 から :7077 に変更
+  volta_url: http://localhost:27070       # ← Part 1 の :27072 から :27070 に変更
   verify_path: /auth/verify
   timeout_ms: 1000                       # auth-proxy は JWT 生成するので少し長め
   pool_max_idle: 32
 
 routing:
   - host: localhost
-    backend: http://localhost:7743       # todo-sample
+    backend: http://localhost:27743       # todo-sample
     app_id: app-todo
 
 healthcheck:
@@ -69,11 +69,11 @@ nohup mvn -q jetty:run > /tmp/jetty-dev.log 2>&1 &
 ポート確認:
 
 ```bash
-$ ss -tlnp | grep -E ':7077|:7743|:8888|:54330'
-:54330  postgres-dev
-:7077   auth-proxy (java)
-:7743   todo-sample (java, jetty)
-:8888   volta-gateway
+$ ss -tlnp | grep -E ':27070|:27743|:28888|:25432'
+:25432  postgres-dev
+:27070   auth-proxy (java)
+:27743   todo-sample (java, jetty)
+:28888   volta-gateway
 ```
 
 4 つ全部 listen していれば OK。
@@ -81,7 +81,7 @@ $ ss -tlnp | grep -E ':7077|:7743|:8888|:54330'
 ## まずは認証なしで 302 redirect を確認
 
 ```bash
-$ curl -s -D - http://localhost:8888/todos | head -5
+$ curl -s -D - http://localhost:28888/todos | head -5
 HTTP/1.1 302 Found
 location: /login
 x-request-id: f030a4a4-7487-4e7c-a4e6-d566338a30ea
@@ -108,10 +108,10 @@ fail-closed の意味。
 ### A. gateway が auth-proxy に繋がらない
 
 ```
-{"message":"backend unreachable","backend":"http://localhost:7077"}
+{"message":"backend unreachable","backend":"http://localhost:27070"}
 ```
 
-→ auth-proxy が起動してない / port 違う。`curl http://localhost:7077/healthz` で個別確認。
+→ auth-proxy が起動してない / port 違う。`curl http://localhost:27070/healthz` で個別確認。
 
 ### B. gateway は 302 を出さずに 502 を返す
 

@@ -10,12 +10,12 @@
 #       backend 上書き (proxy.rs:624) で auth-proxy へ流す。
 
 server:
-  port: 8888
+  port: 28888
   read_timeout_secs: 10
   request_timeout_secs: 30
 
 auth:
-  volta_url: http://auth-proxy:7070      # docker service 名。ローカルの :7077 相当
+  volta_url: http://auth-proxy:27070      # docker service 名。ローカルの :27070 相当
   verify_path: /auth/verify
   timeout_ms: 2000                       # 初回 JWT 署名 + DB は遅いので余裕を持たせる
   pool_max_idle: 32
@@ -23,21 +23,21 @@ auth:
 routing:
   # ── アプリ本体 (localhost) ───────────────────────────────
   - host: localhost
-    backend: http://todo-sample:7743     # 認証が要る既定 backend
+    backend: http://todo-sample:27743     # 認証が要る既定 backend
     app_id: app-todo
     auth_bypass_paths:
       # auth-proxy が自分で描画/処理するパスは「認証スキップ + auth-proxy へ」
-      - { prefix: /login,         backend: http://auth-proxy:7070 }
-      - { prefix: /logout,        backend: http://auth-proxy:7070 }
-      - { prefix: /auth,          backend: http://auth-proxy:7070 }
-      - { prefix: /callback,      backend: http://auth-proxy:7070 }
-      - { prefix: /select-tenant, backend: http://auth-proxy:7070 }
-      - { prefix: /mfa,           backend: http://auth-proxy:7070 }
-      - { prefix: /oauth,         backend: http://auth-proxy:7070 }
-      - { prefix: /api,           backend: http://auth-proxy:7070 }
-      - { prefix: /.well-known,   backend: http://auth-proxy:7070 }
-      - { prefix: /css,           backend: http://auth-proxy:7070 }
-      - { prefix: /js,            backend: http://auth-proxy:7070 }
+      - { prefix: /login,         backend: http://auth-proxy:27070 }
+      - { prefix: /logout,        backend: http://auth-proxy:27070 }
+      - { prefix: /auth,          backend: http://auth-proxy:27070 }
+      - { prefix: /callback,      backend: http://auth-proxy:27070 }
+      - { prefix: /select-tenant, backend: http://auth-proxy:27070 }
+      - { prefix: /mfa,           backend: http://auth-proxy:27070 }
+      - { prefix: /oauth,         backend: http://auth-proxy:27070 }
+      - { prefix: /api,           backend: http://auth-proxy:27070 }
+      - { prefix: /.well-known,   backend: http://auth-proxy:27070 }
+      - { prefix: /css,           backend: http://auth-proxy:27070 }
+      - { prefix: /js,            backend: http://auth-proxy:27070 }
 
   # ── admin console (別 host) ──────────────────────────────
   # console.localhost で静的 SPA を配信。SPA からの /api /auth は

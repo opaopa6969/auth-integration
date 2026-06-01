@@ -20,13 +20,13 @@
 
 ```mermaid
 flowchart LR
-    U[Browser / curl] -->|":8888"| GW[gateway]
-    GW -->|"/todos (要認証)"| APP[todo-sample :7743]
-    GW -->|"/login /auth ... (認証スキップ)"| AP[auth-proxy :7070]
+    U[Browser / curl] -->|":28888"| GW[gateway]
+    GW -->|"/todos (要認証)"| APP[todo-sample :27743]
+    GW -->|"/login /auth ... (認証スキップ)"| AP[auth-proxy :27070]
     GW -->|"console.localhost"| C[console :80]
-    AP --> PG[(postgres :5432)]
-    AP --> RD[(redis :6379)]
-    AP -->|"SMTP"| MP[mailpit :1025/8025]
+    AP --> PG[(postgres :25432)]
+    AP --> RD[(redis :26379)]
+    AP -->|"SMTP"| MP[mailpit :21025/28025]
     C -.->|"/api /auth"| AP
     style GW fill:#fde68a
     style AP fill:#fef3c7
@@ -37,15 +37,15 @@ flowchart LR
 
 | service | 役割 | 公開ポート | ビルド |
 |---|---|---|---|
-| `postgres` | dev DB | 54330→5432 | image |
-| `redis` | auth イベント / telemetry の publish 先 | (内部 6379) | image |
-| `mailpit` | SMTP catcher + メール閲覧 UI | 8025 | image |
-| `auth-proxy` | 本物の認証 backend (Java) | (内部 7070) | ソースから**完全自己完結ビルド** (多段) |
-| `todo-sample` | 対象アプリ (Java/Jetty) | (内部 7743) | maven jetty:run |
+| `postgres` | dev DB | 25432→25432 | image |
+| `redis` | auth イベント / telemetry の publish 先 | (内部 26379) | image |
+| `mailpit` | SMTP catcher + メール閲覧 UI | 28025 | image |
+| `auth-proxy` | 本物の認証 backend (Java) | (内部 27070) | ソースから**完全自己完結ビルド** (多段) |
+| `todo-sample` | 対象アプリ (Java/Jetty) | (内部 27743) | maven jetty:run |
 | `console` | admin SPA (静的) | (内部 80) | nginx + dist |
-| `gateway` | **唯一の入口** (Rust) | 8888 | cargo build (完全自己完結) |
+| `gateway` | **唯一の入口** (Rust) | 28888 | cargo build (完全自己完結) |
 
-> **後輩**「外に開いてるの `8888` と、おまけの `54330` / `8025` だけですね。」
+> **後輩**「外に開いてるの `28888` と、おまけの `25432` / `28025` だけですね。」
 
 > **先輩**「そう。**入口は gateway だけ**ってのが Part 2 で叩き込んだヘッダ信頼モデル
 > (`01-アーキテクチャ決定.md`) の実装。auth-proxy も todo も docker network の中に隠れてて、
@@ -71,10 +71,10 @@ auth-integration/
 
 ## キモ 1: gateway が「同一 host で複数 backend」を捌く方法
 
-> **後輩**「ローカルだと auth-proxy は別ポート (:7077) で直接叩いてました。
+> **後輩**「ローカルだと auth-proxy は別ポート (:27070) で直接叩いてました。
 > でも docker だと auth-proxy は隠れてる。`/login` 画面ってどこから出るんですか?」
 
-> **先輩**「**全部 gateway 経由**にする。`/login` も `/todos` も同じ `localhost:8888`。
+> **先輩**「**全部 gateway 経由**にする。`/login` も `/todos` も同じ `localhost:28888`。
 > ただし振り分け先が違う。」
 
 ここで問題。volta-gateway は **同一 host での path_prefix ルーティングを未サポート**:
@@ -92,10 +92,10 @@ duplicate routing host: ... — path_prefix based routing on same host is not ye
 ```yaml
 routing:
   - host: localhost
-    backend: http://todo-sample:7743        # 既定 = 要認証
+    backend: http://todo-sample:27743        # 既定 = 要認証
     auth_bypass_paths:
-      - { prefix: /login, backend: http://auth-proxy:7070 }  # 認証スキップ + 別 backend
-      - { prefix: /auth,  backend: http://auth-proxy:7070 }
+      - { prefix: /login, backend: http://auth-proxy:27070 }  # 認証スキップ + 別 backend
+      - { prefix: /auth,  backend: http://auth-proxy:27070 }
       # ... /callback /css /js /.well-known /api /mfa /oauth /select-tenant
 ```
 
@@ -141,10 +141,10 @@ sequenceDiagram
 
 | 変数 | ローカル | docker | 理由 |
 |---|---|---|---|
-| `PORT` | 7077 | 7070 | コンテナ内は標準ポート |
+| `PORT` | 27070 | 27070 | コンテナ内は標準ポート |
 | `DB_HOST` | localhost | postgres | service 名で解決 |
-| `DB_PORT` | 54330 | 5432 | コンテナ内ポート |
-| `BASE_URL` | :7077 | :8888 | 入口は gateway |
+| `DB_PORT` | 25432 | 25432 | コンテナ内ポート |
+| `BASE_URL` | :27070 | :28888 | 入口は gateway |
 | `APP_CONFIG_PATH` | dev/... | /app/volta-config.yaml | mount 先 |
 | `NOTIFICATION_CHANNEL` | none | smtp | mailpit に送る |
 
@@ -187,7 +187,7 @@ sequenceDiagram
 > **後輩**「redis も足したんですね。」
 
 > **先輩**「auth-proxy はログイン成功イベントを redis に publish する (`JedisPooled`)。
-> 無いとログイン経路で詰むから、`redis:7-alpine` を 1 個足して `REDIS_URL=redis://redis:6379`。」
+> 無いとログイン経路で詰むから、`redis:7-alpine` を 1 個足して `REDIS_URL=redis://redis:26379`。」
 
 > **先輩**「これで gateway (Rust) も auth-proxy (Java) も todo (Java) も**全部ソースから
 > `docker compose up --build` で立つ**。唯一 console だけ `@unlaxer/dxe-suite` が
@@ -246,21 +246,21 @@ docker compose ps
 
 ```bash
 # 認証なし → 302 /login (リクエストは todo に届いてない = fail-closed)
-curl -s -D - http://localhost:8888/todos | head -3
+curl -s -D - http://localhost:28888/todos | head -3
 # HTTP/1.1 302 Found
 # location: /login
 
 # /login は gateway 経由で auth-proxy が描画 (200)
-curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8888/login
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:28888/login
 # 200
 
 # Magic Link 発行 (DEV_MODE=true なので link が response に返る。Origin は CSRF 対策で必須)
-B=http://localhost:8888
+B=http://localhost:28888
 RESP=$(curl -s -X POST -H 'Content-Type: application/json' -H "Origin: $B" \
             -d '{"email":"alice@example.com"}' $B/auth/magic-link/send)
 echo "$RESP"
-# => {"ok":true,"token":"...","link":"http://localhost:8888/auth/magic-link/verify?token=..."}
-#    届いたメールは mailpit (http://localhost:8025) でも確認できる
+# => {"ok":true,"token":"...","link":"http://localhost:28888/auth/magic-link/verify?token=..."}
+#    届いたメールは mailpit (http://localhost:28025) でも確認できる
 
 # token を verify → cookie 取得 (token は使い捨て。1回だけ叩いて jar に保存)
 TOKEN=$(echo "$RESP" | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')
@@ -273,15 +273,15 @@ curl -s -b /tmp/cj.txt -X POST -H 'Content-Type: application/json' \
 curl -s -b /tmp/cj.txt $B/todos                                   # => [{"id":1,...}]
 
 # admin console
-curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: console.localhost' http://localhost:8888/
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: console.localhost' http://localhost:28888/
 # 200
 ```
 
 > **後輩**「ブラウザだと?」
 
-> **先輩**「`http://localhost:8888/` が todo (未ログインなら `/login` に飛ぶ)、
-> `http://console.localhost:8888/` が admin console、
-> `http://localhost:8025/` が mailpit。
+> **先輩**「`http://localhost:28888/` が todo (未ログインなら `/login` に飛ぶ)、
+> `http://console.localhost:28888/` が admin console、
+> `http://localhost:28025/` が mailpit。
 > 13〜15 章の Magic Link / Passkey / Invite はこの構成のまま全部踏める。」
 
 ---
@@ -297,8 +297,8 @@ docker compose logs auth-proxy | tail -40
 - `relation "users" does not exist` → マイグレーション途中。待つ。
 - `Could not parse RSA private key` → `dev/auth-proxy-dev.env` の `JWT_*_KEY_PEM` の
   `\n` エスケープ崩れ (11 章「詰みポイント A」参照)。
-- DB 接続エラー → `DB_HOST=postgres` / `DB_PORT=5432` になってるか
-  (`auth-proxy.docker.env`)。ローカルの 54330 のままだと刺さる。
+- DB 接続エラー → `DB_HOST=postgres` / `DB_PORT=25432` になってるか
+  (`auth-proxy.docker.env`)。ローカルの 25432 のままだと刺さる。
 
 ### B. `/todos` が 302 ループ
 
@@ -336,10 +336,10 @@ auth-proxy のソースが別の場所なら `AUTH_PROXY_SRC=/path docker compos
 ### H. ログインは通るのに `/todos` が 502 (`client error (Connect)`)
 
 → todo-sample が起動してない or **ポートがズレてる**。この handson の `../todo-sample` は
-pom の jetty ポートが `3001` になってる版があり、文書/gateway 設定の `7743` と食い違う。
-compose の todo-sample ビルドで `sed` で 7743 に正規化済み。
-`docker compose logs todo-sample | grep ServerConnector` で **`0.0.0.0:7743`** を確認。
-`3001` が出てたらビルドキャッシュが古い → `docker compose build --no-cache todo-sample`。
+pom の jetty ポートが `27743` になってる版があり、文書/gateway 設定の `27743` と食い違う。
+compose の todo-sample ビルドで `sed` で 27743 に正規化済み。
+`docker compose logs todo-sample | grep ServerConnector` で **`0.0.0.0:27743`** を確認。
+`27743` が出てたらビルドキャッシュが古い → `docker compose build --no-cache todo-sample`。
 (初回は jetty plugin の DL で 1〜2 分かかる。`-q` を付けないログで進捗が見える)
 
 ### I. ログイン後に `/console/` へ飛ぶ / cookie が取れない
@@ -363,7 +363,7 @@ docker compose down -v         # DB volume も消す (まっさらに戻す)
 ## やったこと
 
 - Part 2 の 4 プロセス手起動を **`docker compose up` 一発**に固めた
-- 入口は gateway (:8888) のみ。backend は network の中に隠した = ヘッダ信頼モデルの実装
+- 入口は gateway (:28888) のみ。backend は network の中に隠した = ヘッダ信頼モデルの実装
 - **path_prefix 非対応**を `auth_bypass_paths` の backend 上書きで回避
 - 秘密は `dev/` から流用、docker 向けの値だけ重ねて上書き
 - console (別 host・静的配信) と mailpit (メール確認) を追加

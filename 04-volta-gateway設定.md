@@ -16,17 +16,17 @@
 
 ```yaml
 server:
-  port: 8888                           # :8080 は他のアプリで使用中だったので 8888
+  port: 28888                           # :8080 は他のアプリで使用中だったので 28888
 
 auth:
-  volta_url: http://localhost:7072     # mock_auth (本物 volta-auth-proxy は :7070 で別に動いてた)
+  volta_url: http://localhost:27072     # mock_auth (本物 volta-auth-proxy は :27070 で別に動いてた)
   verify_path: /auth/verify
   timeout_ms: 500                      # fail-closed
   pool_max_idle: 32
 
 routing:
   - host: localhost
-    backend: http://localhost:7743     # todo-sample
+    backend: http://localhost:27743     # todo-sample
     app_id: app-todo
 
 rate_limit:
@@ -45,19 +45,19 @@ logging:
 
 ### server.port
 
-外から見える唯一のポート。今後の curl は全部 `http://localhost:8888` に投げる。
+外から見える唯一のポート。今後の curl は全部 `http://localhost:28888` に投げる。
 (デフォは :8080 だが、本環境では :8080 が他のアプリ (node の netmahg) で取られていたので避けた)
 
 ### auth.volta_url + verify_path
 
 ```mermaid
 sequenceDiagram
-    Gateway->>Auth: GET http://localhost:7072/auth/verify
+    Gateway->>Auth: GET http://localhost:27072/auth/verify
     Note right of Auth: cookies + headers を転送
     Auth-->>Gateway: 200 + X-Volta-*
 ```
 
-- `volta_url` + `verify_path` で `http://localhost:7072/auth/verify` を組み立てる
+- `volta_url` + `verify_path` で `http://localhost:27072/auth/verify` を組み立てる
 - これは ForwardAuth とほぼ同じパターン。違いは**コネクションプール持ってる**ところ
   (Traefik ForwardAuth は毎回 2 ホップ。volta-gateway は keepalive で再利用)
 
@@ -74,7 +74,7 @@ sequenceDiagram
 ハンズオンなので localhost で受ける。本番は `app.example.com` とかになる。
 ワイルドカード (`*.example.com`) も書ける。
 
-### routing.backend: http://localhost:7743
+### routing.backend: http://localhost:27743
 
 todo-sample の Jetty が listen してるポート。
 

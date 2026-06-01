@@ -6,5 +6,5 @@ idp: []
 
 apps:
   - id: app-todo
-    url: http://localhost:8888
+    url: http://localhost:28888
     allowed_roles: [MEMBER, ADMIN, OWNER]

@@ -54,17 +54,17 @@ sequenceDiagram
 
 ```bash
 cd volta-gateway
-./target/release/examples/mock_auth 7070 &
-# => mock auth listening on 127.0.0.1:7070
+./target/release/examples/mock_auth 27070 &
+# => mock auth listening on 127.0.0.1:27070
 ```
 
 ヘルスチェック:
 
 ```bash
-curl -s http://localhost:7070/healthz
+curl -s http://localhost:27070/healthz
 # => {"status":"ok"}
 
-curl -s -D - http://localhost:7070/auth/verify
+curl -s -D - http://localhost:27070/auth/verify
 # HTTP/1.1 200 OK
 # x-volta-user-id: bench-user-001
 # x-volta-email: bench@example.com
@@ -79,7 +79,7 @@ curl -s -D - http://localhost:7070/auth/verify
 本物起動には PostgreSQL と JWT secret が要る:
 
 ```bash
-docker run --rm -d --name volta-pg -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:16
+docker run --rm -d --name volta-pg -e POSTGRES_PASSWORD=postgres -p 25432:25432 postgres:16
 export DATABASE_URL=postgres://postgres:postgres@localhost/postgres
 export JWT_SECRET="$(openssl rand -hex 32)"
 

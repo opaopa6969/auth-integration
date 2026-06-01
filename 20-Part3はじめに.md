@@ -9,7 +9,7 @@
 | 観点 | mock 編 | 本物編 |
 |---|---|---|
 | 認証 backend | mock\_auth (固定値) | volta-auth-proxy + Google OIDC |
-| 入口 | `http://localhost:8888` | `https://todo.yourdomain.com` |
+| 入口 | `http://localhost:28888` | `https://todo.yourdomain.com` |
 | TLS | なし | Cloudflare で自動 |
 | ネットワーク | 1 ホスト全部 | 自宅マシンを Cloudflare Tunnel で公開 |
 | ユーザ | mock\_auth が返す `bench-user-001` 固定 | 本物の Google アカウント (自分含む) |
@@ -64,10 +64,10 @@ flowchart TB
     end
     subgraph 自宅マシン
         CFD[cloudflared<br/>持続接続]
-        GW[volta-gateway :8888]
+        GW[volta-gateway :28888]
         AP[volta-auth-proxy :7071]
-        APP[todo-sample :7743]
-        PG[(PostgreSQL<br/>:54330)]
+        APP[todo-sample :27743]
+        PG[(PostgreSQL<br/>:25432)]
     end
     G[Google OIDC]
 

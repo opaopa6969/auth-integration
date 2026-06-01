@@ -2,19 +2,19 @@
 # auth-integration ハンズオン専用 — 構成は README.md の図参照
 
 server:
-  port: 8888                           # :8080 は他のアプリで使用中だったので 8888
+  port: 28888                           # :8080 は他のアプリで使用中だったので 28888
   read_timeout_secs: 10
   request_timeout_secs: 30
 
 auth:
-  volta_url: http://localhost:7072     # mock_auth (本物 volta-auth-proxy は :7070 で別に動いてた)
+  volta_url: http://localhost:27072     # mock_auth (本物 volta-auth-proxy は :27070 で別に動いてた)
   verify_path: /auth/verify
   timeout_ms: 500                      # fail-closed: 認証側ダウン → 502
   pool_max_idle: 32
 
 routing:
   - host: localhost
-    backend: http://localhost:7743     # todo-sample (Jetty)
+    backend: http://localhost:27743     # todo-sample (Jetty)
     app_id: app-todo
 
 rate_limit:

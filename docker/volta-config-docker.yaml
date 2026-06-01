@@ -6,10 +6,10 @@ idp: []
 
 apps:
   - id: app-todo
-    # ブラウザ/ curl から見える公開 URL。docker でも入口は gateway :8888。
-    url: http://localhost:8888
+    # ブラウザ/ curl から見える公開 URL。docker でも入口は gateway :28888。
+    url: http://localhost:28888
     allowed_roles: [MEMBER, ADMIN, OWNER]
 
   - id: app-console
-    url: http://console.localhost:8888
+    url: http://console.localhost:28888
     allowed_roles: [ADMIN, OWNER]

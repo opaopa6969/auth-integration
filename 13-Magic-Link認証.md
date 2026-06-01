@@ -74,18 +74,18 @@ sequenceDiagram
 ```bash
 $ curl -s -X POST \
        -H 'Content-Type: application/json' \
-       -H 'Origin: http://localhost:7077' \
+       -H 'Origin: http://localhost:27070' \
        -d '{"email":"alice@example.com"}' \
-       http://localhost:7077/auth/magic-link/send | jq
+       http://localhost:27070/auth/magic-link/send | jq
 {
   "ok": true,
   "message": "Login link sent to alice@example.com",
   "token": "KKgSozyUNDBq-TJJ6wk18TXBXuvURRH4_XuK6h3I1RGh5fWfghwedpw6sOZIw7vv",
-  "link": "http://localhost:7077/auth/magic-link/verify?token=KKgSozyUNDBq-..."
+  "link": "http://localhost:27070/auth/magic-link/verify?token=KKgSozyUNDBq-..."
 }
 ```
 
-> **後輩**「`Origin: http://localhost:7077` 付けてますね、なんで?」
+> **後輩**「`Origin: http://localhost:27070` 付けてますね、なんで?」
 
 > **先輩**「**CSRF 対策**。POST には `Origin` がないと CSRF\_INVALID で蹴られる。
 > 同一オリジンなら exempt されるルールがある (`Main.java` の `isAllowedOrigin`)。」
@@ -112,16 +112,16 @@ echo "$COOKIE"
 ### Step 3: gateway 経由で todo-sample を叩く
 
 ```bash
-$ curl -s -H "Cookie: $COOKIE" http://localhost:8888/todos
+$ curl -s -H "Cookie: $COOKIE" http://localhost:28888/todos
 []
 
 $ curl -s -H "Cookie: $COOKIE" -X POST \
        -H 'Content-Type: application/json' \
        -d '{"title":"alice の本物 todo"}' \
-       http://localhost:8888/todos
+       http://localhost:28888/todos
 {"id":1,"title":"alice の本物 todo","done":false,"createdAt":1779666178500}
 
-$ curl -s -H "Cookie: $COOKIE" http://localhost:8888/todos
+$ curl -s -H "Cookie: $COOKIE" http://localhost:28888/todos
 [{"id":1,"title":"alice の本物 todo","done":false,"createdAt":1779666178500}]
 ```
 
@@ -134,7 +134,7 @@ $ curl -s -H "Cookie: $COOKIE" http://localhost:8888/todos
 `gateway → auth-proxy /auth/verify` のレスポンスヘッダを直接見ると:
 
 ```bash
-$ curl -s -D - -H "Cookie: $COOKIE" http://localhost:7077/auth/verify | head -15
+$ curl -s -D - -H "Cookie: $COOKIE" http://localhost:27070/auth/verify | head -15
 HTTP/1.1 200 OK
 X-Volta-User-Id: 246fd2a1-ce53-4bc0-955a-1a1dc7bc693b
 X-Volta-Email: alice@example.com
@@ -160,28 +160,28 @@ todo-sample は X-Volta-Tenant-Id + X-Volta-User-Id をキーに bucket 分離�
 
 ```bash
 # alice の cookie
-ALICE=$(curl -s -D - -o /dev/null "http://localhost:7077/auth/magic-link/verify?token=$(curl -s -X POST -H 'Content-Type: application/json' -H 'Origin: http://localhost:7077' -d '{"email":"alice@example.com"}' http://localhost:7077/auth/magic-link/send | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')" | awk -F': ' 'BEGIN{IGNORECASE=1} /^set-cookie:/ {print $2}' | head -1 | cut -d';' -f1 | tr -d '\r')
+ALICE=$(curl -s -D - -o /dev/null "http://localhost:27070/auth/magic-link/verify?token=$(curl -s -X POST -H 'Content-Type: application/json' -H 'Origin: http://localhost:27070' -d '{"email":"alice@example.com"}' http://localhost:27070/auth/magic-link/send | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')" | awk -F': ' 'BEGIN{IGNORECASE=1} /^set-cookie:/ {print $2}' | head -1 | cut -d';' -f1 | tr -d '\r')
 
 # bob の cookie
-BOB=$(curl -s -D - -o /dev/null "http://localhost:7077/auth/magic-link/verify?token=$(curl -s -X POST -H 'Content-Type: application/json' -H 'Origin: http://localhost:7077' -d '{"email":"bob@example.com"}' http://localhost:7077/auth/magic-link/send | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')" | awk -F': ' 'BEGIN{IGNORECASE=1} /^set-cookie:/ {print $2}' | head -1 | cut -d';' -f1 | tr -d '\r')
+BOB=$(curl -s -D - -o /dev/null "http://localhost:27070/auth/magic-link/verify?token=$(curl -s -X POST -H 'Content-Type: application/json' -H 'Origin: http://localhost:27070' -d '{"email":"bob@example.com"}' http://localhost:27070/auth/magic-link/send | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')" | awk -F': ' 'BEGIN{IGNORECASE=1} /^set-cookie:/ {print $2}' | head -1 | cut -d';' -f1 | tr -d '\r')
 
 # それぞれ todo 作る
 curl -s -H "Cookie: $ALICE" -X POST -H 'Content-Type: application/json' \
-     -d '{"title":"alice secret"}' http://localhost:8888/todos
+     -d '{"title":"alice secret"}' http://localhost:28888/todos
 # {"id":1,"title":"alice secret",...}
 
 curl -s -H "Cookie: $BOB" -X POST -H 'Content-Type: application/json' \
-     -d '{"title":"bob secret"}' http://localhost:8888/todos
+     -d '{"title":"bob secret"}' http://localhost:28888/todos
 # {"id":1,"title":"bob secret",...}    ← id=1 だが別 bucket
 ```
 
 確認: alice からは alice の todo しか見えない:
 
 ```bash
-$ curl -s -H "Cookie: $ALICE" http://localhost:8888/todos
+$ curl -s -H "Cookie: $ALICE" http://localhost:28888/todos
 [{"id":1,"title":"alice secret",...}]
 
-$ curl -s -H "Cookie: $BOB" http://localhost:8888/todos
+$ curl -s -H "Cookie: $BOB" http://localhost:28888/todos
 [{"id":1,"title":"bob secret",...}]
 ```
 

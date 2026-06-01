@@ -1,7 +1,7 @@
 # =============================================================================
 # auth-integration Part 2 — docker-compose 一式
 #
-#   volta-gateway (:8888 唯一の入口)
+#   volta-gateway (:28888 唯一の入口)
 #     ├─ /todos など       → todo-sample (要認証)
 #     ├─ /login /auth ...   → volta-auth-proxy (認証ページ/API, 認証スキップ)
 #     └─ console.localhost  → volta-auth-console (admin SPA)
@@ -10,9 +10,9 @@
 # 使い方:
 #   1. dev/auth-proxy-dev.env を用意 (11-本物auth-proxy起動.md の手順)
 #   2. docker compose up --build
-#   3. ブラウザ  http://localhost:8888/        (todo)
-#                http://console.localhost:8888/ (admin console)
-#      mailpit   http://localhost:8025/         (届いたメール)
+#   3. ブラウザ  http://localhost:28888/        (todo)
+#                http://console.localhost:28888/ (admin console)
+#      mailpit   http://localhost:28025/         (届いたメール)
 #
 # 詳細は 30-docker-compose化.md 参照。
 # =============================================================================
@@ -22,16 +22,17 @@ services:
   # ── PostgreSQL (dev 独立) ─────────────────────────────────
   postgres:
     image: postgres:16-alpine
+    command: ["postgres", "-p", "25432"]   # 既定 5432 ではなく新ポートで listen
     environment:
       POSTGRES_DB:       volta_auth
       POSTGRES_USER:     volta
       POSTGRES_PASSWORD: volta
     ports:
-      - "54330:5432"           # ホストからも覗けるように (ローカルの dev port に合わせる)
+      - "25432:25432"           # ホストからも覗けるように
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U volta -d volta_auth"]
+      test: ["CMD-SHELL", "pg_isready -U volta -d volta_auth -p 25432"]
       interval: 5s
       timeout: 5s
       retries: 15
@@ -40,13 +41,17 @@ services:
   # ── Redis (auth イベント / tramli-viz telemetry の publish 先) ──
   redis:
     image: redis:7-alpine
+    command: ["redis-server", "--port", "26379"]   # 既定 6379 ではなく新ポート
     restart: unless-stopped
 
   # ── Mailpit (SMTP catcher) ────────────────────────────────
   mailpit:
     image: axllent/mailpit:v1.22
+    environment:
+      MP_UI_BIND_ADDR:   "0.0.0.0:28025"   # 既定 8025 ではなく新ポート (Web UI)
+      MP_SMTP_BIND_ADDR: "0.0.0.0:21025"   # 既定 1025 ではなく新ポート (SMTP)
     ports:
-      - "8025:8025"            # Web UI
+      - "28025:28025"            # Web UI
     restart: unless-stopped
 
   # ── volta-auth-proxy (本物の認証 backend / Java) ──────────
@@ -70,7 +75,7 @@ services:
         COPY --from=build /src/target/volta-auth-proxy-0.3.0-SNAPSHOT.jar /app/app.jar
         # JTE テンプレートは jar に含まれず FS から読むので runtime に同梱
         COPY --from=build /src/src/main/jte /app/src/main/jte
-        EXPOSE 7070
+        EXPOSE 27070
         CMD ["java", "-jar", "/app/app.jar"]
     working_dir: /app
     env_file:
@@ -86,7 +91,7 @@ services:
       mailpit:
         condition: service_started
     healthcheck:
-      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/7070' || exit 1"]
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/27070' || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 30           # 初回はマイグレーション + 起動で数十秒かかる
@@ -101,19 +106,16 @@ services:
         FROM maven:3.9-eclipse-temurin-17
         WORKDIR /app
         COPY pom.xml .
-        # この todo-sample copy は pom の httpConnector port が 3001。
-        # ハンズオン文書 / gateway 設定はすべて 7743 なので 7743 に正規化する。
-        # (pom の <httpConnector><port> は -Djetty.http.port より優先されるため pom 側で直す)
-        RUN sed -i 's#<port>3001</port>#<port>7743</port>#' pom.xml
+        # pom の httpConnector port は 27743 に統一済み (サンプル pom 側で直接設定)。
         # jetty プラグイン本体も含め依存をビルド時に取得 (実行時のDLを無くす)
         RUN mvn -B dependency:resolve dependency:resolve-plugins \
                 org.eclipse.jetty:jetty-maven-plugin:11.0.20:help || true
         COPY src ./src
-        EXPOSE 7743
+        EXPOSE 27743
         # -q を付けない: 付けると Jetty 起動ログもエラーも消えてデバッグ不能になる
         CMD ["mvn", "-B", "jetty:run"]
     healthcheck:
-      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/7743' || exit 1"]
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/27743' || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 20
@@ -151,11 +153,11 @@ services:
          && apt-get install -y --no-install-recommends ca-certificates curl libssl3 \
          && rm -rf /var/lib/apt/lists/*
         COPY --from=build /src/target/release/volta-gateway /usr/local/bin/volta-gateway
-        EXPOSE 8888
+        EXPOSE 28888
         ENTRYPOINT ["volta-gateway"]
         CMD ["/etc/volta/todo-gateway.yaml"]
     ports:
-      - "8888:8888"            # 唯一外に開けるポート
+      - "28888:28888"            # 唯一外に開けるポート
     volumes:
       - ./docker/todo-gateway-docker.yaml:/etc/volta/todo-gateway.yaml:ro
     depends_on:
@@ -166,7 +168,7 @@ services:
       console:
         condition: service_started
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8888/login -o /dev/null || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:28888/login -o /dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 20

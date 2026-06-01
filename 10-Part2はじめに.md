@@ -59,14 +59,14 @@ flowchart TD
 
 ```bash
 $ curl -s -X POST -H 'Content-Type: application/json' \
-       -H 'Origin: http://localhost:7077' \
+       -H 'Origin: http://localhost:27070' \
        -d '{"email":"alice@example.com"}' \
-       http://localhost:7077/auth/magic-link/send
+       http://localhost:27070/auth/magic-link/send
 {
   "ok": true,
   "message": "Login link sent to alice@example.com",
   "token": "KKgSozyUNDBq-TJJ6wk18TXBXuvURRH4_XuK6h3I1RGh5fWfghwedpw6sOZIw7vv",
-  "link": "http://localhost:7077/auth/magic-link/verify?token=..."
+  "link": "http://localhost:27070/auth/magic-link/verify?token=..."
 }
 ```
 
@@ -77,10 +77,10 @@ $ curl -s -X POST -H 'Content-Type: application/json' \
 
 ```mermaid
 flowchart TB
-    C[curl/Browser] --> GW[volta-gateway :8888]
-    GW -.->|/auth/verify<br/>cookie 転送| AP[volta-auth-proxy :7077<br/>DEV_MODE=true<br/>LOCAL_BYPASS_CIDRS=""]
-    GW --> APP[todo-sample :7743]
-    AP --> PG[(PostgreSQL :54330<br/>dev 独立コンテナ)]
+    C[curl/Browser] --> GW[volta-gateway :28888]
+    GW -.->|/auth/verify<br/>cookie 転送| AP[volta-auth-proxy :27070<br/>DEV_MODE=true<br/>LOCAL_BYPASS_CIDRS=""]
+    GW --> APP[todo-sample :27743]
+    AP --> PG[(PostgreSQL :25432<br/>dev 独立コンテナ)]
     style AP fill:#fef3c7
     style PG fill:#fef3c7
     style GW fill:#fde68a
@@ -108,7 +108,7 @@ volta-auth-proxy は LAN/localhost からのリクエストを **デフォで認
 これは便利機能だが、認証フロー検証には邪魔:
 
 ```bash
-$ curl -s -D - http://localhost:7077/auth/verify
+$ curl -s -D - http://localhost:27070/auth/verify
 HTTP/1.1 200 OK
 X-Volta-Auth-Source: local-bypass     ← これ
 ```
@@ -116,7 +116,7 @@ X-Volta-Auth-Source: local-bypass     ← これ
 `.env` で `LOCAL_BYPASS_CIDRS=` (空) を指定して起動すると、ちゃんと 401 が返るようになる:
 
 ```bash
-$ curl -s -D - http://localhost:7077/auth/verify
+$ curl -s -D - http://localhost:27070/auth/verify
 HTTP/1.1 401 Unauthorized
 X-Volta-Auth-Reason: cookie_absent_401
 ```
@@ -129,7 +129,7 @@ X-Volta-Auth-Reason: cookie_absent_401
 {"error":"CSRF_INVALID","message":"CSRF トークンが無効です。"}
 ```
 
-curl で叩く場合は `-H 'Origin: http://localhost:7077'` を付ければ通る
+curl で叩く場合は `-H 'Origin: http://localhost:27070'` を付ければ通る
 (同一オリジン扱いで CSRF 不要)。
 
 ### 3. JWT 秘密鍵を gitignore し忘れる
