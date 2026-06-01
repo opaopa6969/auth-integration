@@ -65,7 +65,7 @@ flowchart TB
     subgraph 自宅マシン
         CFD[cloudflared<br/>持続接続]
         GW[volta-gateway :28888]
-        AP[volta-auth-proxy :7071]
+        AP[volta-auth-proxy :27070]
         APP[todo-sample :27743]
         PG[(PostgreSQL<br/>:25432)]
     end

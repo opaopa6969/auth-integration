@@ -335,11 +335,10 @@ auth-proxy のソースが別の場所なら `AUTH_PROXY_SRC=/path docker compos
 
 ### H. ログインは通るのに `/todos` が 502 (`client error (Connect)`)
 
-→ todo-sample が起動してない or **ポートがズレてる**。この handson の `../todo-sample` は
-pom の jetty ポートが `27743` になってる版があり、文書/gateway 設定の `27743` と食い違う。
-compose の todo-sample ビルドで `sed` で 27743 に正規化済み。
+→ todo-sample が起動してない or **ポートがズレてる**。サンプル pom の jetty ポートは
+`27743` に統一済み (gateway 設定の backend も `todo-sample:27743`)。
 `docker compose logs todo-sample | grep ServerConnector` で **`0.0.0.0:27743`** を確認。
-`27743` が出てたらビルドキャッシュが古い → `docker compose build --no-cache todo-sample`。
+違うポートが出てたらビルドキャッシュが古い → `docker compose build --no-cache todo-sample`。
 (初回は jetty plugin の DL で 1〜2 分かかる。`-q` を付けないログで進捗が見える)
 
 ### I. ログイン後に `/console/` へ飛ぶ / cookie が取れない
