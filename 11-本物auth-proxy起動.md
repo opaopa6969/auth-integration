@@ -8,14 +8,15 @@
 
 ## 0. ソース取得とビルド
 
+> **先輩**「auth-integration の隣に各 repo を clone しておく。まとめてやるなら
+> `./setup.sh` (auth-integration 直下) で 4 repo 一発。手で 1 個だけ要るなら下記。」
+
 ```bash
 git clone https://github.com/opaopa6969/volta-auth-proxy
 cd volta-auth-proxy
 mvn -DskipTests package
 # → target/volta-auth-proxy-0.3.0-SNAPSHOT.jar が出来る
 ```
-
-(本記録の環境では既にビルド済みのものを `/home/opa/work/AskOS-workspace/volta-auth-proxy/` から流用した。)
 
 ## 1. Postgres を立てる (dev 独立)
 
@@ -42,6 +43,10 @@ volta-auth-postgres-dev     0.0.0.0:25432->25432/tcp
 > **後輩**「これは本番と共有しちゃダメ?」
 
 > **先輩**「**ダメ**。dev のセッションを本番に持ち込めなくする。dev 用に新規生成。」
+
+> **先輩**「ちなみに **この章の 2〜3 (鍵生成 + .env 作成) は `./dev/gen-dev-env.sh` 一発**で済む。
+> openssl の鍵生成も PEM の `\n` エスケープも自動。中身を理解したいなら下記を手でやれ。
+> 勉強会で手っ取り早く動かしたいならスクリプトでいい。」
 
 ```bash
 mkdir -p auth-integration/dev

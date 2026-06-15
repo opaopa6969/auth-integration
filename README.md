@@ -121,6 +121,34 @@ flowchart LR
 - ブラウザ (Passkey 章はモダンブラウザ必須)
 - (Part 3 のみ) クレジットカード + Google アカウント
 
+## 準備 (workspace 構築)
+
+`docker-compose.yml` は auth-integration の **兄弟ディレクトリ** を build context に
+している (`../volta-gateway` など)。まず足りない repo を兄弟として clone する:
+
+```bash
+./setup.sh             # ① 4 repo を兄弟に clone (冪等)
+./dev/gen-dev-env.sh   # ② JWT 鍵 + dev/auth-proxy-dev.env を生成 (Part 2 用。冪等)
+docker compose up --build   # ③ 起動 → http://localhost:28888/
+```
+
+> ②③ は Part 2 以降。Part 1 (mock) は ① も ② も不要。
+> docker-compose で 13〜15 章の curl を叩くときは `:27070`→`:28888` に読み替え
+> (auth-proxy は非公開、入口は gateway だけ。詳細は 17 章)。
+
+出来上がるレイアウト:
+
+```
+auth-study/                ← 任意の親ディレクトリ
+├── auth-integration/      ← この repo (手順 + docker-compose)
+├── todo-sample/           ← 対象アプリ (Java/Jetty)
+├── volta-gateway/         ← 唯一の入口 (Rust)
+├── volta-auth-proxy/      ← 認証 backend (Java)
+└── volta-auth-console/    ← admin SPA (/console)
+```
+
+Part 1 (mock) は clone 不要。Part 2 以降で上記が要る。
+
 ## 関連プロジェクト
 
 - [`todo-sample/`](../todo-sample/) — 本ハンズオンの対象アプリ (Java/Jetty)

@@ -8,7 +8,8 @@
 #   volta-auth-proxy → postgres / mailpit
 #
 # 使い方:
-#   1. dev/auth-proxy-dev.env を用意 (11-本物auth-proxy起動.md の手順)
+#   0. ./setup.sh           兄弟ディレクトリに volta-* / todo-sample を clone
+#   1. ./dev/gen-dev-env.sh  JWT 鍵 + dev/auth-proxy-dev.env を生成 (冪等)
 #   2. docker compose up --build
 #   3. ブラウザ  http://localhost:28888/        (todo)
 #                http://console.localhost:28888/ (admin console)
@@ -62,7 +63,7 @@ services:
   #                 javac (JDK) + src/main/jte の同梱が要る (Main.java:72)
   auth-proxy:
     build:
-      context: ${AUTH_PROXY_SRC:-../../AskOS-workspace/volta-auth-proxy}
+      context: ${AUTH_PROXY_SRC:-../volta-auth-proxy}
       dockerfile_inline: |
         FROM maven:3.9-eclipse-temurin-21 AS build
         WORKDIR /src

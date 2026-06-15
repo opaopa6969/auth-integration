@@ -55,11 +55,16 @@ flowchart LR
 
 ## ファイル構成
 
+build context は **兄弟ディレクトリ** (`../volta-gateway` など)。未 clone なら
+`./setup.sh` で 4 repo を兄弟に揃えてから (README「準備」参照)。
+
 ```
 auth-integration/
 ├── docker-compose.yml          ← 本体
+├── setup.sh                     ← 兄弟 repo を clone (冪等)
 ├── dev/
-│   └── auth-proxy-dev.env       ← 秘密 (JWT 鍵 / secret)。11 章で生成済み。gitignore 対象
+│   ├── gen-dev-env.sh           ← JWT 鍵 + auth-proxy-dev.env を生成 (冪等)
+│   └── auth-proxy-dev.env       ← 秘密 (JWT 鍵 / secret)。gen-dev-env.sh が生成。gitignore 対象
 └── docker/
     ├── todo-gateway-docker.yaml ← gateway 設定 (service 名 backend)
     ├── volta-config-docker.yaml ← auth-proxy の apps 定義 (mount)
@@ -241,6 +246,25 @@ docker compose ps
 > `Running migration` を眺めて待て。」
 
 ---
+
+## ⚠️ 13〜15 章の curl を docker フローでやる人へ (ハマりどころ)
+
+13〜15 章は **ローカル起動**前提で `localhost:27070` (auth-proxy 直叩き) を使っている。
+docker-compose では **auth-proxy を外部公開していない**ので、`:27070` を叩くと
+`Connection refused` (curl の `%{http_code}` が `000`) になる。
+
+docker フローでは **すべて gateway 経由 `localhost:28888`** に読み替える:
+
+| ローカル章 (11〜15) の curl | docker フロー (17) では |
+|---|---|
+| `http://localhost:27070/auth/magic-link/send` | `http://localhost:28888/auth/magic-link/send` |
+| `http://localhost:27070/auth/magic-link/verify?...` | `http://localhost:28888/auth/magic-link/verify?...` |
+| `http://localhost:27070/auth/...` (全般) | `http://localhost:28888/auth/...` |
+
+理由は `01-アーキテクチャ決定.md` のヘッダ信頼モデルそのもの:
+**入口は gateway だけ**。auth-proxy は docker network の中に隠れている。
+(`link` フィールドは `BASE_URL=http://localhost:28888` で生成されるので、
+返ってきた link はそのまま叩けば良い。)
 
 ## 疎通確認
 
