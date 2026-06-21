@@ -149,6 +149,11 @@ auth-study/                ← 任意の親ディレクトリ
 
 Part 1 (mock) は clone 不要。Part 2 以降で上記が要る。
 
+## 付録
+
+- [90-起動方法と品質調査メモ.md](90-起動方法と品質調査メモ.md) — docker-compose の起動手順 + ログイン画面の品質調査 (WebAuthn origin / Magic Link フォーム / パスキー導線) と修正内容
+- [91-認証フロー詳細図.md](91-認証フロー詳細図.md) — 認証フローを phase/state 別に分割した詳細 Mermaid (「○○が empty だから○○が出ない」レベルの診断フローチャート)
+
 ## 関連プロジェクト
 
 - [`todo-sample/`](../todo-sample/) — 本ハンズオンの対象アプリ (Java/Jetty)
