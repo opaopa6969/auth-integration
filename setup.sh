@@ -52,13 +52,19 @@ for repo in "${REPOS[@]}"; do
     # ローカル変更あり / fast-forward 不可のときは安全側で skip して警告。
     branch="$(git -C "$dir" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
     git -C "$dir" fetch --quiet origin "$branch" 2>/dev/null || true
-    if [[ -n "$(git -C "$dir" status --porcelain)" ]]; then
-      echo "⚠ $repo : ローカル変更あり → pull skip (手動で git stash && git pull)"
+    # 追跡ファイルに変更があるときだけ skip。未追跡ファイル (個人の設定など) は
+    # fast-forward の邪魔をしないので無視して pull する。
+    if [[ -n "$(git -C "$dir" status --porcelain --untracked-files=no)" ]]; then
+      echo "⚠ $repo : tracked なローカル変更あり → pull skip (手動で git stash && git pull)"
     elif git -C "$dir" merge-base --is-ancestor HEAD "origin/$branch" 2>/dev/null; then
       before="$(git -C "$dir" rev-parse --short HEAD)"
       git -C "$dir" merge --ff-only "origin/$branch" --quiet 2>/dev/null || true
       after="$(git -C "$dir" rev-parse --short HEAD)"
-      if [[ "$before" == "$after" ]]; then echo "✓ $repo : 最新 ($after)"; else echo "↑ $repo : 更新 $before → $after"; fi
+      target="$(git -C "$dir" rev-parse --short "origin/$branch")"
+      if [[ "$before" == "$after" && "$after" != "$target" ]]; then
+        echo "⚠ $repo : pull できず ($before のまま、未追跡ファイル衝突の可能性) → 手動確認"
+      elif [[ "$before" == "$after" ]]; then echo "✓ $repo : 最新 ($after)"
+      else echo "↑ $repo : 更新 $before → $after"; fi
     else
       echo "⚠ $repo : fast-forward 不可 (分岐) → skip (手動で確認)"
     fi
