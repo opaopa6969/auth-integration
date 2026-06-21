@@ -1,0 +1,16 @@
+# cloudflared tunnel 設定 — Part 3 テンプレート
+# 通常 ~/.cloudflared/config.yml に置く。23章で作成する。
+#
+# <TUNNEL_ID> と yourdomain.com を自分の値に置換。
+# ingress は「公開ホスト名 → ローカルの gateway:28888」を対応づける。
+# 末尾の service: http_status:404 は catch-all (必須)。
+
+tunnel: <TUNNEL_ID>
+credentials-file: /home/youruser/.cloudflared/<TUNNEL_ID>.json
+
+ingress:
+  - hostname: todo.yourdomain.com
+    service: http://localhost:28888
+  - hostname: console.yourdomain.com
+    service: http://localhost:28888
+  - service: http_status:404

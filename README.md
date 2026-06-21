@@ -100,6 +100,13 @@ flowchart LR
 | 28 | [28-マルチユーザ確認.md](28-マルチユーザ確認.md) | 別アカウントでテナント分離を実証 | 10 分 |
 | 29 | [29-本番運用に向けた残課題.md](29-本番運用に向けた残課題.md) | RBAC / DB バックアップ / 監視 | 読むだけ |
 
+設定テンプレは [`part3/`](part3/) (env / volta-config / gateway / cloudflared)。起動は Part 2 の
+compose に override を重ねる:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.part3.yml up --build -d
+```
+
 ---
 
 ## 進め方

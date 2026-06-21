@@ -1,0 +1,24 @@
+# docker-compose override — Part 3 (Google OIDC / 公開ドメイン)
+#
+# 使い方:
+#   1. part3/*.template.* を .template を外した名前でコピーし yourdomain.com 等を置換
+#        cp part3/auth-proxy-prod.env.template      part3/auth-proxy-prod.env
+#        cp part3/volta-config-prod.template.yaml   part3/volta-config-prod.yaml
+#        cp part3/todo-gateway-prod.template.yaml   part3/todo-gateway-prod.yaml
+#   2. 別ターミナルで  cloudflared tunnel run todo-handson   (23章)
+#   3. 起動:
+#        docker compose -f docker-compose.yml -f docker-compose.part3.yml up --build -d
+#
+# Part 2 の docker-compose.yml に対する差分だけを書く (env_file と config マウントの差し替え)。
+
+services:
+  auth-proxy:
+    env_file:
+      - ./dev/auth-proxy-dev.env       # 秘密(JWT 鍵)は Part 2 から流用
+      - ./part3/auth-proxy-prod.env    # Part 3 の上書き (Google / 公開ドメイン / DEV_MODE=false)
+    volumes:
+      - ./part3/volta-config-prod.yaml:/app/volta-config.yaml:ro
+
+  gateway:
+    volumes:
+      - ./part3/todo-gateway-prod.yaml:/etc/volta/todo-gateway.yaml:ro

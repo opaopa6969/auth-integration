@@ -1,0 +1,20 @@
+# volta-auth-proxy app 設定 — Part 3 (本番想定) テンプレート
+# part3/volta-config-prod.yaml にコピーして yourdomain.com を置換。
+#
+# idp について:
+#   Google は env (GOOGLE_CLIENT_ID 等) があれば自動で有効になる (env fallback)。
+#   なので idp: は空のままでよい。
+#   逆に idp: に項目を書くと「config で明示した provider だけ」を使う挙動になる
+#   (VoltaConfig.hasIdpSection = !idp.isEmpty)。複数 IdP を順序制御したいとき用。
+version: 1
+
+idp: []
+
+apps:
+  - id: app-todo
+    url: https://todo.yourdomain.com
+    allowed_roles: [MEMBER, ADMIN, OWNER]
+
+  - id: app-console
+    url: https://console.yourdomain.com
+    allowed_roles: [ADMIN, OWNER]

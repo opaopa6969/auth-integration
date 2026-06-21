@@ -1,0 +1,55 @@
+# volta-gateway 設定 — Part 3 (公開ドメイン) テンプレート
+# part3/todo-gateway-prod.yaml にコピーして yourdomain.com を置換。
+#
+# Part 2 (docker/todo-gateway-docker.yaml) との違いは routing の host だけ:
+#   localhost          → todo.yourdomain.com
+#   console.localhost  → console.yourdomain.com
+# cloudflared がこの2つの hostname を gateway:28888 に流し込む (23章)。
+#
+# 制約: gateway は「同一 host での path_prefix ルーティング」非対応。
+#       1 host = 1 route とし、auth-proxy が出すページ/API は
+#       auth_bypass_paths の backend 上書きで auth-proxy へ流す。
+
+server:
+  port: 28888
+  read_timeout_secs: 10
+  request_timeout_secs: 30
+
+auth:
+  volta_url: http://auth-proxy:27070
+  verify_path: /auth/verify
+  timeout_ms: 2000
+  pool_max_idle: 32
+
+routing:
+  # ── アプリ本体 ───────────────────────────────────────────
+  - host: todo.yourdomain.com
+    backend: http://todo-sample:27743
+    app_id: app-todo
+    auth_bypass_paths:
+      - { prefix: /login,         backend: http://auth-proxy:27070 }
+      - { prefix: /logout,        backend: http://auth-proxy:27070 }
+      - { prefix: /auth,          backend: http://auth-proxy:27070 }
+      - { prefix: /callback,      backend: http://auth-proxy:27070 }  # ← Google の redirect 先
+      - { prefix: /select-tenant, backend: http://auth-proxy:27070 }
+      - { prefix: /settings,      backend: http://auth-proxy:27070 }
+      - { prefix: /mfa,           backend: http://auth-proxy:27070 }
+      - { prefix: /oauth,         backend: http://auth-proxy:27070 }
+      - { prefix: /api,           backend: http://auth-proxy:27070 }
+      - { prefix: /.well-known,   backend: http://auth-proxy:27070 }
+      - { prefix: /css,           backend: http://auth-proxy:27070 }
+      - { prefix: /js,            backend: http://auth-proxy:27070 }
+
+  # ── admin console ───────────────────────────────────────
+  - host: console.yourdomain.com
+    backend: http://console:80
+    app_id: app-console
+    public: true
+
+healthcheck:
+  interval_secs: 30
+  path: /healthz
+
+logging:
+  level: info
+  format: pretty
