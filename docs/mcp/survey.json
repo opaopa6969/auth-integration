@@ -1,0 +1,55 @@
+{
+  "repo": "auth-integration",
+  "surveyed_at": "2026-08-21T23:13:55Z",
+  "kind": "workspace",
+  "summary": "todo-sample × volta-gateway × volta-auth-proxy の認証連携を段階的に体験するハンズオン手順書リポジトリ。実行可能コードを独自に持たず、docker-compose と手順ドキュメント(30ファイル)のみ。実体は4つの兄弟リポジトリ(todo-sample, volta-gateway, volta-auth-proxy, volta-auth-console)を束ねる構成ファイルと設定テンプレート。",
+  "decision": "skip",
+  "decision_reason": "このリポジトリ自体はサーバ・ライブラリ・CLI いずれでもなく、手順書(Markdown)と compose/設定テンプレートのみの workspace である。エージェントが呼べる実行可能な能力を持たないため MCP 化の対象にならない。構成要素は各々独立リポジトリとして既に別途調査対象になり得る。手順書という性質上、skill 化(認証構築手順のナレッジ)の可能性はあるが、それは持ち主の判断で別リポジトリ(volta-auth-proxy 側)に属するべきものであり、このリポジトリで独自に配る価値は薄い。",
+  "existing": {
+    "http_api": false,
+    "cli": false,
+    "mcp": false,
+    "healthz": false,
+    "volta_manifest": false,
+    "hosted_url": null
+  },
+  "proposed_namespace": null,
+  "capabilities": [
+    {
+      "verb": "認証連携ハンズオンの構成手順を参照する",
+      "kind": "resource",
+      "name": "guide",
+      "uri": null
+    },
+    {
+      "verb": "認証プロキシパターンの構築手順(ヘッダ信頼モデル・mock→本物→Google OIDC)を案内する",
+      "kind": "skill",
+      "name": "auth-proxy-hands-on",
+      "locality": "global"
+    }
+  ],
+  "composition_examples": [
+    "skill:auth-proxy-hands-on → volta__svc_add / volta__gateway_routes_apply のように、構築手順に沿って volta 基盤操作を組み合わせる",
+    "このリポジトリ自体は能力を持たないため、構成要素(volta-auth-proxy等)の MCP 化が先。そちらから ability を公開すべき"
+  ],
+  "dependencies": [
+    { "repo": "todo-sample", "direction": "depends_on", "capability": "認証対象アプリ(Java/Jetty)", "exists_now": true, "note": "兄弟ディレクトリ ../todo-sample を build context に使用" },
+    { "repo": "volta-gateway", "direction": "depends_on", "capability": "リバースプロキシ(Rust) / 唯一の入口", "exists_now": true, "note": "兄弟ディレクトリ ../volta-gateway を build context に使用。catalog に volta-gateway 関連あり" },
+    { "repo": "volta-auth-proxy", "direction": "depends_on", "capability": "認証 backend(Java) / OAuth2/OIDC/Magic Link/Passkey", "exists_now": true, "note": "兄弟ディレクトリ ../volta-auth-proxy を build context に使用。catalog id=volta-auth-proxy (retired)" },
+    { "repo": "volta-auth-console", "direction": "depends_on", "capability": "admin SPA(React) / ユーザ・テナント・セッション管理UI", "exists_now": true, "note": "兄弟ディレクトリ ../volta-auth-console を build context に使用。catalog id=volta-auth-console" }
+  ],
+  "library_serve": {
+    "needed": false,
+    "new_work": [],
+    "runtime": "other",
+    "estimated_effort": "S"
+  },
+  "risks": [
+    "dev/ 配下に JWT 秘密鍵・volta-service-token 等が平文で配置される(.gitignore 対象だが誤コミットリスク)",
+    "docker-compose.yml が兄弟リポジトリのローカルパス(../volta-gateway 等)に依存し、setup.sh で clone する前提。CI 環境等では未設定で失敗する"
+  ],
+  "open_questions": [
+    "認証構築手順を skill として配る場合、このリポジトリから出すか volta-auth-proxy 側で出すか。持ち主の判断が要る",
+    "volta-auth-proxy は catalog で retired 扱いだが、このハンズオンでは現役で使われている。retired の理由と後継(volta-auth-server?)の関係を持ち主に確認すべき"
+  ]
+}

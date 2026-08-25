@@ -15,7 +15,7 @@
 #                http://console.localhost:28888/ (admin console)
 #      mailpit   http://localhost:28025/         (届いたメール)
 #
-# 詳細は 30-docker-compose化.md 参照。
+# 詳細は 17-docker-compose化.md 参照。
 # =============================================================================
 
 services:

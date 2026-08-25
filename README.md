@@ -151,7 +151,7 @@ auth-study/                ← 任意の親ディレクトリ
 ├── todo-sample/           ← 対象アプリ (Java/Jetty)
 ├── volta-gateway/         ← 唯一の入口 (Rust)
 ├── volta-auth-proxy/      ← 認証 backend (Java)
-└── volta-auth-console/    ← admin SPA (/console)
+└── volta-auth-console/    ← admin SPA (console.localhost のルート)
 ```
 
 Part 1 (mock) は clone 不要。Part 2 以降で上記が要る。
@@ -166,4 +166,4 @@ Part 1 (mock) は clone 不要。Part 2 以降で上記が要る。
 - [`todo-sample/`](../todo-sample/) — 本ハンズオンの対象アプリ (Java/Jetty)
 - [`volta-gateway/`](../volta-gateway/) — Rust 製リバースプロキシ
 - [`volta-auth-proxy/`](https://github.com/opaopa6969/volta-auth-proxy) — 認証 backend (Java)
-- [`volta-auth-console/`](https://github.com/opaopa6969/volta-auth-console) — admin SPA (`/console`)
+- [`volta-auth-console/`](https://github.com/opaopa6969/volta-auth-console) — admin SPA (`console.localhost:28888/`)
