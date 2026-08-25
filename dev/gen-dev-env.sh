@@ -13,6 +13,7 @@
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")"   # dev/ に移動
+INTEGRATION_DIR="$(cd .. && pwd)"
 
 gen() {  # gen <file> <生成コマンド...>
   local f="$1"; shift
@@ -62,7 +63,7 @@ ALLOWED_REDIRECT_DOMAINS=localhost,127.0.0.1
 VOLTA_SERVICE_TOKEN=$SVC
 DEV_MODE=true
 LOCAL_BYPASS_CIDRS=
-APP_CONFIG_PATH=dev/volta-config-dev.yaml
+APP_CONFIG_PATH=$INTEGRATION_DIR/dev/volta-config-dev.yaml
 NOTIFICATION_CHANNEL=none
 WEBHOOK_ENABLED=false
 AUDIT_SINK=postgres
