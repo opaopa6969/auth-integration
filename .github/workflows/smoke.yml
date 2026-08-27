@@ -42,9 +42,9 @@ jobs:
 
       - name: Build images (exclude console, needs prebuilt dist/)
         working-directory: ${{ github.workspace }}/auth-integration
-        # --no-deps: gateway は console に depends_on するが、console は
-        # dist/ が無いと build できないため依存 build を抑制する。
-        run: docker compose build --no-deps postgres redis mailpit auth-proxy todo-sample gateway
+        # docker compose build は depends_on を見ず、指定 service のみ build する。
+        # console は明示的に指定しないことで build を除外。
+        run: docker compose build postgres redis mailpit auth-proxy todo-sample gateway
 
       - name: Up (detached, exclude console)
         working-directory: ${{ github.workspace }}/auth-integration
