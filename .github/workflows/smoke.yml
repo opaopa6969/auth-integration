@@ -42,11 +42,18 @@ jobs:
 
       - name: Build images (exclude console, needs prebuilt dist/)
         working-directory: ${{ github.workspace }}/auth-integration
-        run: docker compose build postgres redis mailpit auth-proxy todo-sample gateway
+        # --no-deps: gateway は console に depends_on するが、console は
+        # dist/ が無いと build できないため依存 build を抑制する。
+        run: docker compose build --no-deps postgres redis mailpit auth-proxy todo-sample gateway
 
       - name: Up (detached, exclude console)
         working-directory: ${{ github.workspace }}/auth-integration
-        run: docker compose up -d postgres redis mailpit auth-proxy todo-sample gateway
+        # --no-deps: console の自動起動を抑制。起動順は依存関係に従い手動で。
+        # 依存 service が未起動でも healthcheck が retry で待つので冪等。
+        run: |
+          docker compose up -d --no-deps postgres redis mailpit
+          docker compose up -d --no-deps auth-proxy todo-sample
+          docker compose up -d --no-deps gateway
 
       - name: Wait for gateway healthy
         working-directory: ${{ github.workspace }}/auth-integration
