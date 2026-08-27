@@ -1,0 +1,87 @@
+name: smoke
+
+# Issue #1: setup.sh → compose up → health check の再現性を機械検証
+# 範囲: A案（最小）— 起動して各 service の healthcheck が green になること。
+# Magic Link / token 取得（B案）や docs lint（C案）は意図的に含めない:
+#   - B案は auth-proxy 本体の機能テストであり、この repo の配管検証範囲外
+#   - C案は別 PR で段階導入可能
+# 平文機密値は扱わない（dev ローカルファイル前提は Issue 本文通り）。
+#
+# console (admin SPA) はホストでビルド済みの dist/ を前提とし、かつ
+# file:../DxE-suite 依存があるため CI 環境ではビルドできない。
+# 配管検証（A案）において console は必須でないため、build/up で明示的に除外する。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  setup-and-up:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout auth-integration
+        uses: actions/checkout@v4
+
+      # setup.sh は兄弟ディレクトリに 4 repo を clone する。
+      # runner 上では親ディレクトリに書き込めるので、この checkout を
+      # auth-study/auth-integration と見立てる。
+      - name: Setup workspace (clone sibling repos)
+        working-directory: ${{ github.workspace }}
+        run: |
+          # github.workspace 直下に auth-integration がある状態。
+          # setup.sh は自分の親 (= github.workspace) に兄弟を clone する。
+          ./auth-integration/setup.sh
+
+      - name: Generate dev env (JWT keys + auth-proxy-dev.env)
+        run: ./auth-integration/dev/gen-dev-env.sh
+
+      - name: Build images (exclude console, needs prebuilt dist/)
+        working-directory: ./auth-integration
+        run: docker compose build postgres redis mailpit auth-proxy todo-sample gateway
+
+      - name: Up (detached, exclude console)
+        working-directory: ./auth-integration
+        run: docker compose up -d postgres redis mailpit auth-proxy todo-sample gateway
+
+      - name: Wait for gateway healthy
+        working-directory: ./auth-integration
+        env:
+          MAX_WAIT: 300
+        run: |
+          # 各 service は healthcheck を持つ。compose up -d のあと
+          # gateway が healthy になれば下流 (auth-proxy/todo-sample/console) も
+          # depends_on で起動済み。gateway の /login が 200 になるまで待つ。
+          for i in $(seq 1 "$MAX_WAIT"); do
+            code=$(docker compose exec -T gateway curl -s -o /dev/null -w '%{http_code}' http://localhost:28888/login 2>/dev/null || echo "000")
+            if [ "$code" = "200" ]; then
+              echo "gateway /login -> 200 (after ${i}s)"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "gateway /login did not return 200 within ${MAX_WAIT}s"
+          docker compose ps
+          docker compose logs --tail=50
+          exit 1
+
+      - name: Service health summary
+        working-directory: ./auth-integration
+        run: |
+          # healthcheck を持つ service の状態を表示
+          docker compose ps
+          # postgres / auth-proxy / gateway が healthy であることを確認
+          for svc in postgres auth-proxy gateway; do
+            state=$(docker compose ps --format json "$svc" | jq -r '.Health' 2>/dev/null || echo "unknown")
+            echo "$svc: $state"
+          done
+
+      - name: Dump logs on failure
+        if: failure()
+        working-directory: ./auth-integration
+        run: |
+          docker compose ps --all
+          docker compose logs --tail=100
