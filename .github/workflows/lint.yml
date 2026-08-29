@@ -1,0 +1,134 @@
+name: lint
+
+# 配管の静的整合性を保つ lightweight test。
+# smoke.yml が「起動して healthcheck」(重い・docker 要る) なら、
+# こちらは「ソースを読んで壊れてないか」(軽い・docker 不要)。
+#
+# 依存は ubuntu-latest 標準ツール (shellcheck / bash / python3 / git) のみ。
+# smoke.yml と同じ trigger で両方走るが、こっちは PR 上で数秒で落ちる。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      # ─────────────────────────────────────────────────────────
+      # 1. shell scripts — 構文 + shellcheck 静的解析
+      #    setup.sh / gen-dev-env.sh は冪等性ロジックが複雑で回帰しやすい。
+      #    書き戻し条件・fetch/merge 分岐・secret 出力有無を機械検証する。
+      # ─────────────────────────────────────────────────────────
+      - name: Shell syntax + shellcheck
+        run: |
+          set -e
+          scripts=(setup.sh dev/gen-dev-env.sh)
+          for s in "${scripts[@]}"; do
+            bash -n "$s"
+          done
+          # ubuntu-latest には shellcheck が入っている
+          shellcheck --version | head -1
+          shellcheck "${scripts[@]}"
+
+      # ─────────────────────────────────────────────────────────
+      # 2. 生成された秘密ファイルが全て gitignore されていること
+      #    gen-dev-env.sh が PEM / secret / env を生成するが、
+      #    いずれかが .gitignore から漏れると秘密が commit される。
+      #    「.gitignore の行 = 生成物の path」を対応付けて検証。
+      # ─────────────────────────────────────────────────────────
+      - name: Generated secrets are gitignored
+        run: |
+          set -e
+          missing=0
+          for f in \
+            dev/jwt-private.pem \
+            dev/jwt-public.pem \
+            dev/jwt-key-encryption-secret.txt \
+            dev/volta-service-token.txt \
+            dev/auth-proxy-dev.env
+          do
+            # .gitignore に「行として完全一致」で書かれているか
+            if ! grep -Fx "$f" .gitignore >/dev/null; then
+              echo "::error::$f が .gitignore に無い (秘密の commit リスク)"
+              missing=1
+            fi
+          done
+          # 二重防衛: git が既に追跡していないか
+          tracked_secrets=$(git ls-files dev/ | grep -E '\.(pem|env|txt)$' || true)
+          if [[ -n "$tracked_secrets" ]]; then
+            echo "::error::dev/ に秘密系ファイルが git 追跡されている:"
+            echo "$tracked_secrets"
+            missing=1
+          fi
+          exit $missing
+
+      # ─────────────────────────────────────────────────────────
+      # 3. compose が参照するローカルファイルが repo に存在すること
+      #    env_file / volumes の mount 先が無いと compose up が起動時 fail。
+      #    smoke.yml は docker 要るので重い → ここで事前検知する。
+      #
+      #    dev/auth-proxy-dev.env は gen-dev-env.sh が生成する gitignore 対象
+      #    (ソース管理外)なので、ここでは生成元 template の存在を検証する。
+      #    生成物自体の gitignore は test 2 で、生成スクリプトは test 1 で検証済み。
+      # ─────────────────────────────────────────────────────────
+      - name: compose referenced files exist
+        run: |
+          set -e
+          missing=0
+          for f in \
+            dev/auth-proxy-dev.env.template \
+            docker/auth-proxy.docker.env \
+            docker/volta-config-docker.yaml \
+            docker/todo-gateway-docker.yaml \
+            docker/console.nginx.conf
+          do
+            if [[ ! -f "$f" ]]; then
+              echo "::error::compose 参照元の $f が無い (起動時 fail)"
+              missing=1
+            fi
+          done
+          exit $missing
+
+      # ─────────────────────────────────────────────────────────
+      # 4. gateway routing の app_id と auth-proxy apps の id が一致
+      #    gateway と auth-proxy で app_id を別々に持つ構成(分散管理)で、
+      #    片方だけ直すと「認証できない app」が黙って残る。
+      #    gateway の routing[].app_id ⊆ auth-proxy の apps[].id を検証。
+      # ─────────────────────────────────────────────────────────
+      - name: app_id consistency (gateway ↔ auth-proxy)
+        run: |
+          python3 - <<'PY'
+          import sys, yaml
+          gw = yaml.safe_load(open('docker/todo-gateway-docker.yaml'))
+          ap = yaml.safe_load(open('docker/volta-config-docker.yaml'))
+          gw_ids = {r.get('app_id') for r in gw.get('routing', []) if r.get('app_id')}
+          ap_ids = {a.get('id') for a in ap.get('apps', []) if a.get('id')}
+          miss = sorted(gw_ids - ap_ids)
+          if miss:
+              print(f"::error::gateway にある app_id が auth-proxy に無い: {miss}")
+              sys.exit(1)
+          print("OK: app_id 一致", sorted(gw_ids))
+          PY
+
+      # ─────────────────────────────────────────────────────────
+      # 5. part3/ には .template. 付きファイルのみ(本番秘密混入防止)
+      #    part3/auth-proxy-prod.env (実体) が commit されると Client Secret 等が漏れる。
+      #    .template 付きだけを許可し、実体は .gitignore の外でも NG にする。
+      # ─────────────────────────────────────────────────────────
+      - name: part3 templates only (no real prod secrets)
+        run: |
+          set -e
+          bad=$(find part3 -type f \( -name '*.env' -o -name '*.yaml' -o -name '*.yml' \) \
+                  ! -name '*.template.*' -print || true)
+          if [[ -n "$bad" ]]; then
+            echo "::error::part3/ に .template. 無しの設定ファイルがある (本番秘密混入リスク):"
+            echo "$bad"
+            exit 1
+          fi
+          echo "OK: part3/ は .template.* のみ"
