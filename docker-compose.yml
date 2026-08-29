@@ -29,7 +29,7 @@ services:
       POSTGRES_USER:     volta
       POSTGRES_PASSWORD: volta
     ports:
-      - "25432:25432"           # ホストからも覗けるように
+      - "127.0.0.1:25432:25432"     # ホストからも覗けるように (localhost 限定)
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -52,7 +52,7 @@ services:
       MP_UI_BIND_ADDR:   "0.0.0.0:28025"   # 既定 8025 ではなく新ポート (Web UI)
       MP_SMTP_BIND_ADDR: "0.0.0.0:21025"   # 既定 1025 ではなく新ポート (SMTP)
     ports:
-      - "28025:28025"            # Web UI
+      - "127.0.0.1:28025:28025"    # Web UI (localhost 限定)
     restart: unless-stopped
 
   # ── volta-auth-proxy (本物の認証 backend / Java) ──────────
@@ -158,7 +158,7 @@ services:
         ENTRYPOINT ["volta-gateway"]
         CMD ["/etc/volta/todo-gateway.yaml"]
     ports:
-      - "28888:28888"            # 唯一外に開けるポート
+      - "127.0.0.1:28888:28888"    # 唯一外に開けるポート (localhost 限定)
     volumes:
       - ./docker/todo-gateway-docker.yaml:/etc/volta/todo-gateway.yaml:ro
     depends_on:
