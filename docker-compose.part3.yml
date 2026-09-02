@@ -7,11 +7,18 @@
 #        cp part3/todo-gateway-prod.template.yaml   part3/todo-gateway-prod.yaml
 #   2. 別ターミナルで  cloudflared tunnel run todo-handson   (23章)
 #   3. 起動:
-#        docker compose -f docker-compose.yml -f docker-compose.part3.yml up --build -d
+#        docker compose --env-file part3/auth-proxy-prod.env \
+#          -f docker-compose.yml -f docker-compose.part3.yml up --build -d
 #
 # Part 2 の docker-compose.yml に対する差分だけを書く (env_file と config マウントの差し替え)。
 
 services:
+  postgres:
+    # The same DB_PASSWORD is used by auth-proxy and PostgreSQL.
+    environment:
+      POSTGRES_USER: ${DB_USER:?Set DB_USER in part3/auth-proxy-prod.env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in part3/auth-proxy-prod.env}
+
   auth-proxy:
     env_file:
       - ./dev/auth-proxy-dev.env       # 秘密(JWT 鍵)は Part 2 から流用

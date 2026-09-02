@@ -59,8 +59,13 @@ services:
 起動:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.part3.yml up --build -d
+docker compose --env-file part3/auth-proxy-prod.env \
+  -f docker-compose.yml -f docker-compose.part3.yml up --build -d
 ```
+
+`DB_PASSWORD` は auth-proxy と PostgreSQL の両方に渡されます。テンプレートの
+プレースホルダーを本番用の値に置き換えてください。`--env-file` は Compose の
+変数補間に必要です。
 
 23章の `cloudflared tunnel run` も別ターミナルで起動しておく。
 
