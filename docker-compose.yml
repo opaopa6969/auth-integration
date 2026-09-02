@@ -26,14 +26,16 @@ services:
     command: ["postgres", "-p", "25432"]   # 既定 5432 ではなく新ポートで listen
     environment:
       POSTGRES_DB:       volta_auth
-      POSTGRES_USER:     volta
-      POSTGRES_PASSWORD: volta
+      POSTGRES_USER:     ${DB_USER:-volta}
+      # Part 3 passes DB_PASSWORD through Compose's interpolation environment.
+      # Keep volta as the local-development default.
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-volta}
     ports:
       - "127.0.0.1:25432:25432"     # ホストからも覗けるように (localhost 限定)
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U volta -d volta_auth -p 25432"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-volta} -d volta_auth -p 25432"]
       interval: 5s
       timeout: 5s
       retries: 15

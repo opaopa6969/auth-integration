@@ -104,8 +104,12 @@ flowchart LR
 compose に override を重ねる:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.part3.yml up --build -d
+docker compose --env-file part3/auth-proxy-prod.env \
+  -f docker-compose.yml -f docker-compose.part3.yml up --build -d
 ```
+
+`DB_PASSWORD` は auth-proxy と PostgreSQL の両方に使われます。Part 3 の
+env ファイルで本番用の値に置き換え、上記の `--env-file` を付けて起動してください。
 
 ---
 
