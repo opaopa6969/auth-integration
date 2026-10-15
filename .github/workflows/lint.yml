@@ -15,7 +15,7 @@ on:
 
 jobs:
   static-checks:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, auth-integration-ci]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -25,6 +25,9 @@ jobs:
       #    setup.sh / gen-dev-env.sh は冪等性ロジックが複雑で回帰しやすい。
       #    書き戻し条件・fetch/merge 分岐・secret 出力有無を機械検証する。
       # ─────────────────────────────────────────────────────────
+      - name: Install shellcheck (self-hosted runner has no sudo)
+        run: command -v shellcheck || { curl -fsSL https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.linux.x86_64.tar.xz | tar -xJ -C "$RUNNER_TEMP" && echo "$RUNNER_TEMP/shellcheck-v0.10.0" >> "$GITHUB_PATH"; }
+
       - name: Shell syntax + shellcheck
         run: |
           set -e
@@ -32,7 +35,7 @@ jobs:
           for s in "${scripts[@]}"; do
             bash -n "$s"
           done
-          # ubuntu-latest には shellcheck が入っている
+          # shellcheck は直前の step で用意する
           shellcheck --version | head -1
           shellcheck "${scripts[@]}"
 
